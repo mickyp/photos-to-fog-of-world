@@ -4,7 +4,7 @@ Convert a folder of geotagged photos into a Fog of World compatible `GPX` track.
 
 This skill scans photos recursively, extracts timestamps and GPS coordinates from EXIF metadata, sorts all usable points by capture time, and writes a `GPX` file that Fog of World can import.
 
-Traditional Chinese documentation:
+正體中文版 README：
 
 - [README.zh-TW.md](README.zh-TW.md)
 
