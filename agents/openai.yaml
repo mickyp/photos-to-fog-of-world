@@ -1,0 +1,4 @@
+interface:
+  display_name: "Photos to Fog of World"
+  short_description: "Convert geotagged photos into GPX"
+  default_prompt: "Use $photos-to-fog-of-world to turn a folder of geotagged photos into a Fog of World GPX track."

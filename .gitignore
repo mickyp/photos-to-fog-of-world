@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local outputs
+*.gpx
+*.kml
+*.json
+*.csv
+
+# OS / editor
+.DS_Store
+Thumbs.db
