@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import locale
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,6 +27,8 @@ SCHEMA_LOCATION = (
     "http://www.topografix.com/GPX/1/1 "
     "http://www.topografix.com/GPX/1/1/gpx.xsd"
 )
+YEAR_DIR_PATTERN = re.compile(r"^\d{4}$")
+SPLIT_SCAN_THRESHOLD = 1000
 
 
 @dataclass
@@ -37,6 +41,15 @@ class TrackPoint:
     altitude: float | None
 
 
+@dataclass
+class ConversionResult:
+    input_dir: Path
+    output_path: Path | None
+    track_points: list[TrackPoint]
+    skipped_count: int
+    warning_text: str | None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Create a GPX track from geotagged photos for Fog of World."
@@ -45,7 +58,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-o",
         "--output",
-        help="Output GPX file path. Defaults to <input_dir>/fog_of_world_import.gpx",
+        help=(
+            "Output GPX file path. Defaults to "
+            "<input_dir>/<folder-name>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx"
+        ),
     )
     parser.add_argument(
         "--timezone",
@@ -56,10 +72,47 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--name",
-        default="photo import",
-        help="Track name written into the GPX file",
+        help="Track name written into the GPX file. Defaults to the input folder name.",
+    )
+    parser.add_argument(
+        "--reuse-existing-child-gpx",
+        action="store_true",
+        help=(
+            "For yearly folders, reuse the newest child-directory GPX when present "
+            "instead of rescanning that child directory."
+        ),
     )
     return parser.parse_args()
+
+
+def slugify_folder_name(name: str) -> str:
+    normalized = re.sub(r"\s+", "-", name.strip())
+    normalized = re.sub(r'[<>:"/\\|?*]+', "-", normalized)
+    normalized = re.sub(r"-{2,}", "-", normalized).strip("-.")
+    return normalized or "photo-folder"
+
+
+def default_output_path(input_dir: Path, now: datetime | None = None) -> Path:
+    timestamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    folder_name = slugify_folder_name(input_dir.name)
+    return input_dir / f"{folder_name}_fog_of_world_{timestamp}.gpx"
+
+
+def normalize_cli_path(path_value: str) -> Path:
+    expanded = os.path.expanduser(path_value)
+    return Path(os.path.abspath(expanded))
+
+
+def prepare_windows_long_path(path_value: Path) -> str:
+    resolved = str(path_value)
+    if os.name != "nt":
+        return resolved
+    normalized = resolved.replace("/", "\\")
+    if normalized.startswith("\\\\?\\"):
+        return normalized
+    if normalized.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + normalized.lstrip("\\")
+    return "\\\\?\\" + normalized
 
 
 def resolve_default_timezone(tz_name: str | None) -> ZoneInfo | timezone:
@@ -75,7 +128,7 @@ def find_exiftool() -> str:
 
     local_app_data = os.environ.get("LOCALAPPDATA")
     candidates = [
-        Path(r"C:\Users\169896\AppData\Local\Programs\ExifTool\ExifTool.exe"),
+        Path(r"C:\Users\micky\AppData\Local\Programs\ExifTool\ExifTool.exe"),
     ]
     if local_app_data:
         candidates.append(Path(local_app_data) / "Programs" / "ExifTool" / "ExifTool.exe")
@@ -101,11 +154,67 @@ def ensure_exiftool_available(exiftool_cmd: str) -> None:
         raise SystemExit(f"Unable to run exiftool: {exc.stderr.strip()}") from exc
 
 
-def read_photo_metadata(input_dir: Path, exiftool_cmd: str) -> list[dict]:
+def count_supported_files(input_dir: Path) -> int:
+    total = 0
+    for path in input_dir.rglob("*"):
+        if path.is_file() and path.suffix.lower().lstrip(".") in SUPPORTED_EXTENSIONS:
+            total += 1
+    return total
+
+
+def count_supported_files_non_recursive(input_dir: Path) -> int:
+    total = 0
+    for path in input_dir.iterdir():
+        if path.is_file() and path.suffix.lower().lstrip(".") in SUPPORTED_EXTENSIONS:
+            total += 1
+    return total
+
+
+def count_supported_files_in_immediate_child_dirs(input_dir: Path) -> list[tuple[Path, int]]:
+    child_counts: list[tuple[Path, int]] = []
+    for child in input_dir.iterdir():
+        if child.is_dir():
+            child_counts.append((child, count_supported_files(child)))
+    return child_counts
+
+
+def exiftool_filename_charset() -> str:
+    if os.name == "nt":
+        encoding = locale.getpreferredencoding(False).lower()
+        if encoding in {"cp950", "ms950", "big5"}:
+            return "cp950"
+    return "utf8"
+
+
+def normalize_exiftool_warning_text(warning_text: str | None) -> str | None:
+    if not warning_text:
+        return None
+
+    filtered_lines: list[str] = []
+    for line in warning_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("Invalid Charset cp950"):
+            continue
+        if stripped.startswith("FileName encoding not specified."):
+            continue
+        filtered_lines.append(stripped)
+
+    if not filtered_lines:
+        return None
+    return "\n".join(filtered_lines)
+
+
+def read_photo_metadata(input_dir: Path, exiftool_cmd: str) -> tuple[list[dict], str | None]:
     command = [
         exiftool_cmd,
         "-n",
         "-json",
+        "-charset",
+        f"filename={exiftool_filename_charset()}",
+        "-if",
+        "($gpslatitude and $gpslongitude) and ($datetimeoriginal or $createdate)",
         "-r",
         "-FileName",
         "-Directory",
@@ -121,8 +230,57 @@ def read_photo_metadata(input_dir: Path, exiftool_cmd: str) -> list[dict]:
         command.extend(["-ext", extension])
     command.append(str(input_dir))
 
-    result = subprocess.run(command, capture_output=True, text=True, check=True)
-    return json.loads(result.stdout)
+    result = subprocess.run(command, capture_output=True, check=False)
+    stdout_text = result.stdout.decode("utf-8", errors="replace")
+    stderr_text = normalize_exiftool_warning_text(
+        result.stderr.decode("utf-8", errors="replace").strip() or None
+    )
+
+    if not stdout_text.strip():
+        if result.returncode != 0 and not stderr_text:
+            raise SystemExit("exiftool failed without producing metadata")
+        return [], stderr_text
+
+    return json.loads(stdout_text), stderr_text
+
+
+def read_photo_metadata_non_recursive(
+    input_dir: Path, exiftool_cmd: str
+) -> tuple[list[dict], str | None]:
+    command = [
+        exiftool_cmd,
+        "-n",
+        "-json",
+        "-charset",
+        f"filename={exiftool_filename_charset()}",
+        "-if",
+        "($gpslatitude and $gpslongitude) and ($datetimeoriginal or $createdate)",
+        "-FileName",
+        "-Directory",
+        "-DateTimeOriginal",
+        "-CreateDate",
+        "-OffsetTimeOriginal",
+        "-OffsetTime",
+        "-GPSLatitude",
+        "-GPSLongitude",
+        "-GPSAltitude",
+    ]
+    for extension in SUPPORTED_EXTENSIONS:
+        command.extend(["-ext", extension])
+    command.append(str(input_dir))
+
+    result = subprocess.run(command, capture_output=True, check=False)
+    stdout_text = result.stdout.decode("utf-8", errors="replace")
+    stderr_text = normalize_exiftool_warning_text(
+        result.stderr.decode("utf-8", errors="replace").strip() or None
+    )
+
+    if not stdout_text.strip():
+        if result.returncode != 0 and not stderr_text:
+            raise SystemExit("exiftool failed without producing metadata")
+        return [], stderr_text
+
+    return json.loads(stdout_text), stderr_text
 
 
 def parse_offset(offset_value: str | None) -> timezone | None:
@@ -143,15 +301,48 @@ def parse_offset(offset_value: str | None) -> timezone | None:
     return timezone(sign * delta)
 
 
+def parse_flexible_exif_datetime(timestamp_text: str) -> datetime | None:
+    normalized = " ".join(timestamp_text.strip().split())
+    normalized = normalized.replace("\u4e0a\u5348", "AM").replace("\u4e0b\u5348", "PM")
+
+    for candidate in {
+        normalized,
+        re.sub(r"\b(AM|PM)\b\s*", "", normalized).strip(),
+        re.sub(r"\s*(AM|PM)\s*$", lambda m: f" {m.group(1)}", normalized).strip(),
+    }:
+        for fmt in (EXIF_DATE_FORMAT, "%Y:%m:%d %I:%M:%S %p", "%Y:%m:%d %p %I:%M:%S"):
+            try:
+                return datetime.strptime(candidate, fmt)
+            except ValueError:
+                continue
+    return None
+
+
+def parse_exif_datetime(timestamp_text: str) -> datetime | None:
+    normalized = " ".join(timestamp_text.strip().split())
+    normalized = normalized.replace("上午", "AM").replace("下午", "PM")
+
+    for candidate in {
+        normalized,
+        re.sub(r"\b(AM|PM)\b\s*", "", normalized).strip(),
+        re.sub(r"\s*(AM|PM)\s*$", lambda m: f" {m.group(1)}", normalized).strip(),
+    }:
+        for fmt in (EXIF_DATE_FORMAT, "%Y:%m:%d %I:%M:%S %p", "%Y:%m:%d %p %I:%M:%S"):
+            try:
+                return datetime.strptime(candidate, fmt)
+            except ValueError:
+                continue
+    return None
+
+
 def pick_capture_time(entry: dict) -> str | None:
     return entry.get("DateTimeOriginal") or entry.get("CreateDate")
 
 
 def build_track_points(
     metadata_rows: Iterable[dict], fallback_tz: ZoneInfo | timezone
-) -> tuple[list[TrackPoint], list[str]]:
+) -> list[TrackPoint]:
     track_points: list[TrackPoint] = []
-    skipped: list[str] = []
 
     for entry in metadata_rows:
         source_file = entry.get("SourceFile") or entry.get("FileName") or "<unknown>"
@@ -161,10 +352,11 @@ def build_track_points(
         altitude = entry.get("GPSAltitude")
 
         if not timestamp_text or latitude is None or longitude is None:
-            skipped.append(source_file)
             continue
 
-        naive_time = datetime.strptime(timestamp_text, EXIF_DATE_FORMAT)
+        naive_time = parse_flexible_exif_datetime(timestamp_text)
+        if naive_time is None:
+            continue
         offset = parse_offset(entry.get("OffsetTimeOriginal")) or parse_offset(
             entry.get("OffsetTime")
         )
@@ -186,7 +378,7 @@ def build_track_points(
         )
 
     track_points.sort(key=lambda item: item.capture_time_utc)
-    return track_points, skipped
+    return track_points
 
 
 def build_gpx(track_points: list[TrackPoint], track_name: str) -> ET.Element:
@@ -244,44 +436,270 @@ def indent_xml(element: ET.Element) -> None:
 def write_gpx(output_path: Path, gpx_root: ET.Element) -> None:
     indent_xml(gpx_root)
     tree = ET.ElementTree(gpx_root)
-    tree.write(output_path, encoding="utf-8", xml_declaration=True)
+    with open(prepare_windows_long_path(output_path), "wb") as handle:
+        tree.write(handle, encoding="utf-8", xml_declaration=True)
+
+
+def find_child_dirs(input_dir: Path) -> list[Path]:
+    child_dirs = [
+        child
+        for child in input_dir.iterdir()
+        if child.is_dir()
+    ]
+    return sorted(child_dirs, key=lambda path: path.name)
+
+
+def find_latest_child_gpx(child_dir: Path) -> Path | None:
+    candidates = sorted(
+        child_dir.glob("*_fog_of_world_*.gpx"),
+        key=lambda path: path.stat().st_mtime,
+    )
+    return candidates[-1] if candidates else None
+
+
+def build_default_track_name(input_dir: Path) -> str:
+    return input_dir.name
+
+
+def read_track_points_from_gpx(gpx_path: Path) -> list[TrackPoint]:
+    tree = ET.parse(gpx_path)
+    root = tree.getroot()
+    namespace = {"gpx": GPX_NAMESPACE}
+    track_points: list[TrackPoint] = []
+
+    for point_el in root.findall(".//gpx:trkpt", namespace):
+        lat = point_el.attrib.get("lat")
+        lon = point_el.attrib.get("lon")
+        time_el = point_el.find("gpx:time", namespace)
+        ele_el = point_el.find("gpx:ele", namespace)
+        if lat is None or lon is None or time_el is None or not time_el.text:
+            continue
+        capture_time_utc = datetime.fromisoformat(time_el.text.replace("Z", "+00:00"))
+        track_points.append(
+            TrackPoint(
+                source_file=str(gpx_path),
+                capture_time_local=capture_time_utc,
+                capture_time_utc=capture_time_utc,
+                latitude=float(lat),
+                longitude=float(lon),
+                altitude=float(ele_el.text) if ele_el is not None and ele_el.text else None,
+            )
+        )
+
+    track_points.sort(key=lambda item: item.capture_time_utc)
+    return track_points
+
+
+def convert_directory(
+    input_dir: Path,
+    exiftool_cmd: str,
+    fallback_tz: ZoneInfo | timezone,
+    output_path: Path | None = None,
+    track_name: str | None = None,
+) -> ConversionResult:
+    supported_file_count = count_supported_files(input_dir)
+    metadata_rows, warning_text = read_photo_metadata(input_dir, exiftool_cmd)
+    track_points = build_track_points(metadata_rows, fallback_tz)
+
+    resolved_output = output_path or default_output_path(input_dir)
+    if track_points:
+        gpx_root = build_gpx(track_points, track_name or build_default_track_name(input_dir))
+        write_gpx(resolved_output, gpx_root)
+    else:
+        resolved_output = None
+
+    return ConversionResult(
+        input_dir=input_dir,
+        output_path=resolved_output,
+        track_points=track_points,
+        skipped_count=max(supported_file_count - len(track_points), 0),
+        warning_text=warning_text,
+    )
+
+
+def merge_warning_texts(warning_texts: list[str | None]) -> str | None:
+    normalized = [text.strip() for text in warning_texts if text and text.strip()]
+    if not normalized:
+        return None
+    return "\n".join(dict.fromkeys(normalized))
+
+
+def convert_directory_non_recursive(
+    input_dir: Path,
+    exiftool_cmd: str,
+    fallback_tz: ZoneInfo | timezone,
+    output_path: Path | None = None,
+    track_name: str | None = None,
+) -> ConversionResult:
+    supported_file_count = count_supported_files_non_recursive(input_dir)
+    metadata_rows, warning_text = read_photo_metadata_non_recursive(input_dir, exiftool_cmd)
+    track_points = build_track_points(metadata_rows, fallback_tz)
+
+    resolved_output = output_path or default_output_path(input_dir)
+    if track_points:
+        gpx_root = build_gpx(track_points, track_name or build_default_track_name(input_dir))
+        write_gpx(resolved_output, gpx_root)
+    else:
+        resolved_output = None
+
+    return ConversionResult(
+        input_dir=input_dir,
+        output_path=resolved_output,
+        track_points=track_points,
+        skipped_count=max(supported_file_count - len(track_points), 0),
+        warning_text=warning_text,
+    )
+
+
+def convert_directory_adaptive(
+    input_dir: Path,
+    exiftool_cmd: str,
+    fallback_tz: ZoneInfo | timezone,
+    output_path: Path | None = None,
+    track_name: str | None = None,
+    split_threshold: int = SPLIT_SCAN_THRESHOLD,
+) -> ConversionResult:
+    child_counts = count_supported_files_in_immediate_child_dirs(input_dir)
+    total_child_supported_files = sum(count for _, count in child_counts)
+    child_dirs_with_supported_files = [child for child, count in child_counts if count > 0]
+
+    if child_dirs_with_supported_files and total_child_supported_files > split_threshold:
+        merged_points: list[TrackPoint] = []
+        child_skipped_total = 0
+        child_warning_texts: list[str | None] = []
+
+        for child_dir in child_dirs_with_supported_files:
+            child_result = convert_directory_adaptive(
+                child_dir,
+                exiftool_cmd,
+                fallback_tz,
+                split_threshold=split_threshold,
+            )
+            print_conversion_summary(child_result, fallback_tz, label=child_dir.name)
+            merged_points.extend(child_result.track_points)
+            child_skipped_total += child_result.skipped_count
+            child_warning_texts.append(child_result.warning_text)
+
+        root_result = convert_directory_non_recursive(input_dir, exiftool_cmd, fallback_tz)
+        print_conversion_summary(root_result, fallback_tz, label=f"{input_dir.name} ROOT")
+        merged_points.extend(root_result.track_points)
+        merged_points.sort(key=lambda item: item.capture_time_utc)
+
+        resolved_output = output_path or default_output_path(input_dir)
+        if merged_points:
+            gpx_root = build_gpx(merged_points, track_name or build_default_track_name(input_dir))
+            write_gpx(resolved_output, gpx_root)
+        else:
+            resolved_output = None
+
+        return ConversionResult(
+            input_dir=input_dir,
+            output_path=resolved_output,
+            track_points=merged_points,
+            skipped_count=child_skipped_total + root_result.skipped_count,
+            warning_text=merge_warning_texts(child_warning_texts + [root_result.warning_text]),
+        )
+
+    return convert_directory(
+        input_dir,
+        exiftool_cmd,
+        fallback_tz,
+        output_path=output_path,
+        track_name=track_name,
+    )
+
+
+def print_conversion_summary(
+    result: ConversionResult, fallback_tz: ZoneInfo | timezone, label: str | None = None
+) -> None:
+    prefix = f"{label}: " if label else ""
+    if result.output_path:
+        print(f"{prefix}Wrote GPX: {result.output_path}")
+    else:
+        print(f"{prefix}No photos with both timestamp and GPS coordinates were found")
+    print(f"{prefix}Track points: {len(result.track_points)}")
+    print(f"{prefix}Skipped files: {result.skipped_count}")
+    if result.warning_text:
+        safe_warning_text = result.warning_text.encode(
+            sys.stdout.encoding or "utf-8", errors="replace"
+        ).decode(sys.stdout.encoding or "utf-8", errors="replace")
+        print(f"{prefix}ExifTool warnings: {safe_warning_text}")
+    print(
+        f"{prefix}Timezone assumption: "
+        f"{getattr(fallback_tz, 'key', str(fallback_tz))} for timestamps without offsets"
+    )
 
 
 def main() -> int:
     args = parse_args()
-    input_dir = Path(args.input_dir).expanduser().resolve()
-    output_path = (
-        Path(args.output).expanduser().resolve()
-        if args.output
-        else input_dir / "fog_of_world_import.gpx"
-    )
-
+    input_dir = normalize_cli_path(args.input_dir)
     if not input_dir.exists() or not input_dir.is_dir():
         raise SystemExit(f"Input directory does not exist: {input_dir}")
 
     exiftool_cmd = find_exiftool()
     ensure_exiftool_available(exiftool_cmd)
     fallback_tz = resolve_default_timezone(args.timezone)
-    metadata_rows = read_photo_metadata(input_dir, exiftool_cmd)
-    track_points, skipped = build_track_points(metadata_rows, fallback_tz)
+    child_dirs = find_child_dirs(input_dir) if YEAR_DIR_PATTERN.fullmatch(input_dir.name) else []
 
-    if not track_points:
-        raise SystemExit("No photos with both timestamp and GPS coordinates were found")
+    if child_dirs:
+        yearly_points: list[TrackPoint] = []
+        saw_warning = False
+        total_skipped_files = 0
 
-    gpx_root = build_gpx(track_points, args.name)
-    write_gpx(output_path, gpx_root)
+        for child_dir in child_dirs:
+            existing_child_gpx = (
+                find_latest_child_gpx(child_dir) if args.reuse_existing_child_gpx else None
+            )
+            if existing_child_gpx:
+                child_points = read_track_points_from_gpx(existing_child_gpx)
+                child_result = ConversionResult(
+                    input_dir=child_dir,
+                    output_path=existing_child_gpx,
+                    track_points=child_points,
+                    skipped_count=0,
+                    warning_text="reused existing child-directory GPX",
+                )
+            else:
+                child_result = convert_directory_adaptive(child_dir, exiftool_cmd, fallback_tz)
 
-    print(f"Wrote GPX: {output_path}")
-    print(f"Track points: {len(track_points)}")
-    print(f"Skipped files: {len(skipped)}")
-    if skipped:
-        for item in skipped:
-            print(f"  skipped: {item}")
-    print(
-        "Timezone assumption: "
-        f"{getattr(fallback_tz, 'key', str(fallback_tz))} for timestamps without offsets"
+            print_conversion_summary(child_result, fallback_tz, label=child_dir.name)
+            yearly_points.extend(child_result.track_points)
+            total_skipped_files += child_result.skipped_count
+            saw_warning = saw_warning or bool(child_result.warning_text)
+
+        root_result = convert_directory_non_recursive(input_dir, exiftool_cmd, fallback_tz)
+        print_conversion_summary(root_result, fallback_tz, label="ROOT")
+        yearly_points.extend(root_result.track_points)
+        total_skipped_files += root_result.skipped_count
+        saw_warning = saw_warning or bool(root_result.warning_text)
+
+        yearly_points.sort(key=lambda item: item.capture_time_utc)
+        if not yearly_points:
+            return 1
+
+        yearly_output_path = (
+            normalize_cli_path(args.output)
+            if args.output
+            else default_output_path(input_dir)
+        )
+        yearly_gpx_root = build_gpx(yearly_points, args.name or build_default_track_name(input_dir))
+        write_gpx(yearly_output_path, yearly_gpx_root)
+        print(f"YEAR: Wrote GPX: {yearly_output_path}")
+        print(f"YEAR: Track points: {len(yearly_points)}")
+        print(f"YEAR: Skipped files: {total_skipped_files}")
+        if saw_warning:
+            print("YEAR: Completed with one or more ExifTool warnings during monthly scans")
+        return 0
+
+    single_result = convert_directory_adaptive(
+        input_dir,
+        exiftool_cmd,
+        fallback_tz,
+        output_path=normalize_cli_path(args.output) if args.output else None,
+        track_name=args.name,
     )
-    return 0
+    print_conversion_summary(single_result, fallback_tz)
+    return 0 if single_result.track_points else 1
 
 
 if __name__ == "__main__":
