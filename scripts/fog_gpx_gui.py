@@ -304,8 +304,18 @@ class FogGpxApp:
         self._widgets["export_button"] = ttk.Button(actions, command=self._start_export)
         self._widgets["export_button"].grid(row=0, column=1, sticky="e")
 
-        self.log_text = tk.Text(frame, height=10, wrap="word", state="disabled")
-        self.log_text.grid(row=8, column=0, columnspan=3, sticky="nsew")
+        log_frame = ttk.Frame(frame)
+        log_frame.grid(row=8, column=0, columnspan=3, sticky="nsew")
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+
+        self.log_text = tk.Text(log_frame, height=10, wrap="word", state="disabled")
+        self.log_text.grid(row=0, column=0, sticky="nsew")
+        self._widgets["log_scrollbar"] = ttk.Scrollbar(
+            log_frame, orient="vertical", command=self.log_text.yview
+        )
+        self._widgets["log_scrollbar"].grid(row=0, column=1, sticky="ns")
+        self.log_text.configure(yscrollcommand=self._widgets["log_scrollbar"].set)
 
         self._widgets["status_label"] = ttk.Label(frame, textvariable=self.status_var)
         self._widgets["status_label"].grid(row=9, column=0, columnspan=3, sticky="w", pady=(12, 0))
