@@ -48,17 +48,17 @@
 
 釋出新版本時，只需要修改這個檔案。
 
-## 打包檔名規則
+## 版本顯示位置
 
-Windows 打包輸出的檔名會自動加上版本號：
+Windows 打包輸出的檔名維持固定：
 
-- `photos-to-gpx-cli-v<version>.exe`
-- `photos-to-gpx-gui-v<version>.exe`
+- `photos-to-gpx-cli.exe`
+- `photos-to-gpx-gui.exe`
 
-例如當 `VERSION` 是 `1.0.0` 時，輸出會是：
+版號應顯示在程式內容中，而不是執行檔檔名：
 
-- `photos-to-gpx-cli-v1.0.0.exe`
-- `photos-to-gpx-gui-v1.0.0.exe`
+- GUI：顯示在視窗標題
+- CLI：可用 `--version` 查看
 
 ## 建議釋出流程
 

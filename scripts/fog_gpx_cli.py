@@ -6,12 +6,18 @@ from __future__ import annotations
 import argparse
 import sys
 
+from app_version import APP_VERSION
 from build_fog_gpx import RunOptions, normalize_cli_path, run_conversion
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Scan a photo folder and export a Fog of World compatible GPX file."
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s v{APP_VERSION}",
     )
     parser.add_argument(
         "input_dir",

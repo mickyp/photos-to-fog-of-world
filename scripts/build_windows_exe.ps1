@@ -8,17 +8,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $versionFile = Join-Path $repoRoot "VERSION"
-if (-not (Test-Path $versionFile)) {
-    throw "VERSION file was not found."
-}
-
-$version = (Get-Content $versionFile -Raw).Trim()
-if (-not $version) {
-    throw "VERSION file is empty."
-}
-
-$cliName = "photos-to-gpx-cli-v$version"
-$guiName = "photos-to-gpx-gui-v$version"
+$cliName = "photos-to-gpx-cli"
+$guiName = "photos-to-gpx-gui"
 
 $exiftool = & $Python -c "from scripts.build_fog_gpx import find_exiftool; print(find_exiftool())" 2>$null
 if (-not $exiftool) {
@@ -42,7 +33,8 @@ $commonArgs = @(
     "--distpath", $DistDir,
     "--workpath", "build\pyinstaller",
     "--specpath", "build\spec",
-    "--add-binary", "$exiftool;."
+    "--add-binary", "$exiftool;.",
+    "--add-data", "$versionFile;."
 )
 
 if ($OneFile) {
