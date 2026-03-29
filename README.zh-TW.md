@@ -2,7 +2,7 @@
 
 把有 GPS 資訊的照片資料夾轉成 Fog of World 可匯入的 `GPX` 軌跡。
 
-這個工具會遞迴掃描照片、讀取拍攝時間與座標，依照拍攝時間排序後輸出 `GPX`。現在除了原本的 Python 腳本，也另外提供比較適合一般 Windows 使用者的版本：
+這個工具會遞迴掃描照片、讀取拍攝時間與座標，依照拍攝時間排序後輸出 `GPX`。除了原本的 Python 腳本，專案也提供較適合 Windows 使用者的版本：
 
 - `scripts/fog_gpx_cli.py`：命令列版
 - `scripts/fog_gpx_gui.py`：小視窗版
@@ -31,7 +31,9 @@
 scoop install exiftool
 ```
 
-如果你是要封裝給別人使用，可以直接跑內建的打包腳本；它會把 `exiftool.exe` 一起包進執行檔內。
+如果你是要自行封裝 Windows 執行檔，可以直接跑內建的打包腳本；它會把 `exiftool.exe` 一起包進執行檔內。
+
+如果你只是想直接使用 Windows 版本，則可直接從 GitHub Releases 下載已打包好的執行檔。
 
 ## 輸出結果
 
@@ -185,7 +187,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
 - `dist\photos-to-gpx-cli.exe`
 - `dist\photos-to-gpx-gui.exe`
 
-這兩個執行檔都已經把 `exiftool.exe` 一起包進去，所以交給別人時，只需要提供單一 `.exe`，不需要再另外安裝 `exiftool`。
+這兩個執行檔都已經把 `exiftool.exe` 一起包進去，因此直接下載後即可使用，不需要再另外安裝 `exiftool`。
 
 版號會從專案根目錄的 `VERSION` 檔案讀取；每次釋出前只需要修改那個檔案即可。GUI 會在視窗標題顯示版號，CLI 則可用 `--version` 查看。
 

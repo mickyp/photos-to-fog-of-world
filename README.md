@@ -19,7 +19,7 @@ Traditional Chinese README:
 - Python 3
 - `exiftool`
 
-If you want to share this with Windows users who do not have Python or a local coding agent, this repo now also includes:
+In addition to the Python scripts, this repo also includes Windows-friendly entry points:
 
 - `scripts/fog_gpx_cli.py`: a friendlier command-line entry point
 - `scripts/fog_gpx_gui.py`: a simple desktop window for choosing a folder
@@ -32,6 +32,8 @@ If `exiftool` is not already available on `PATH`, install it with Scoop:
 ```powershell
 scoop install exiftool
 ```
+
+If you only want to use the Windows build, you can download a packaged executable from GitHub Releases instead.
 
 ## Output
 
@@ -183,7 +185,7 @@ By default this creates:
 - `dist\photos-to-gpx-cli.exe`
 - `dist\photos-to-gpx-gui.exe`
 
-The packaging script bundles `exiftool.exe` inside each executable, so the recipient only needs a single downloaded `.exe`.
+Each packaged executable already includes `exiftool.exe`, so the downloaded `.exe` can be used directly without a separate `exiftool` installation.
 
 The version number comes from the repository-root `VERSION` file. Update that file before each release. The GUI shows the version in the window title, and the CLI shows it with `--version`.
 
