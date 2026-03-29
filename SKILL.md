@@ -9,6 +9,8 @@ description: Convert a folder of photos into a Fog of World importable GPX track
 
 Convert geotagged photos into a Fog of World compatible GPX track. Run the bundled script against the target folder, keep only photos with timestamps and GPS, and tell the user what was included or skipped.
 
+When users point at a parent trip/month/year folder, keep that parent folder as the export root. Do not force them to choose the deepest leaf folder if they want a merged result.
+
 ## Workflow
 
 1. Confirm the target folder path. Assume the current workspace if the user clearly refers to it.
@@ -20,6 +22,19 @@ Convert geotagged photos into a Fog of World compatible GPX track. Run the bundl
 7. If photo timestamps do not include an offset, pass `--timezone` using the user's locale timezone when it is known.
 8. Return the output GPX path and summarize how many files became track points versus how many were skipped.
 9. When the yearly folder already has valid child-directory GPX files and a full rescan would take too long, it is acceptable to reuse the latest GPX in each child directory and only rescan child directories that do not have one yet.
+
+Folder example:
+
+```text
+2024
+├─ 01 Taipei Trip
+│  ├─ Day 1
+│  └─ Day 2
+└─ 02 Tainan Trip
+   └─ Day 1
+```
+
+If the user selects `2024`, the tool should scan downward, create child-folder GPX files where appropriate, and also leave one merged timestamped GPX back in `2024`.
 
 ## Command
 
@@ -51,7 +66,7 @@ Use `--reuse-existing-child-gpx` when a yearly folder already contains child GPX
 ## Output Expectations
 
 - Produce a `.gpx` file that Fog of World can import.
-- Prefer the default timestamped filename so repeated exports from different folders remain distinguishable.
+- Prefer the default timestamped filename so repeated exports remain distinguishable. This timestamped default should stay consistent across the skill workflow, the CLI, and the GUI.
 - For year-bucket inputs, leave each child-directory GPX beside the corresponding photos and write the merged yearly GPX at the year root.
 - Mention the timezone assumption when timestamps lacked an embedded offset.
 - Call out skipped files when they were missing GPS or timestamps.

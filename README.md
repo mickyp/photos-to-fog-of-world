@@ -44,12 +44,49 @@ Default output paths:
 - Child directory GPX: `<input-folder>/<child>/<child>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx`
 - Yearly merged: `<input-folder>/<folder-name>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx`
 
+Every default output filename includes a timestamp down to seconds. This applies consistently to the skill workflow, the CLI, and the GUI whenever you let the tool choose the output path automatically.
+
+## Folder Selection
+
+In normal use, choose the highest folder that represents the trip, month, or year you want to export. Do **not** drill down to the deepest leaf folder unless you intentionally want only that one leaf exported.
+
+Example:
+
+```text
+2024
+├─ 01 Taipei Trip
+│  ├─ Day 1
+│  │  ├─ IMG_0001.JPG
+│  │  └─ IMG_0002.JPG
+│  └─ Day 2
+│     └─ IMG_0003.JPG
+└─ 02 Tainan Trip
+   └─ Day 1
+      └─ IMG_0100.JPG
+```
+
+If you choose `2024`, the tool will scan downward recursively, process the child folders, and then create a merged GPX back in `2024`.
+
+Typical results:
+
+```text
+2024
+├─ 01 Taipei Trip
+│  ├─ Day 1
+│  ├─ Day 2
+│  └─ 01-Taipei-Trip_fog_of_world_20260329-130501.gpx
+├─ 02 Tainan Trip
+│  ├─ Day 1
+│  └─ 02-Tainan-Trip_fog_of_world_20260329-130508.gpx
+└─ 2024_fog_of_world_20260329-130520.gpx
+```
+
 ## How It Works
 
 The conversion uses these rules:
 
-- Read photos recursively
-- For year folders, process each first-level child directory independently and then merge them
+- Read photos recursively from the selected folder down to the deepest supported-photo folders
+- For year folders, process each first-level child directory independently and then merge them back into a GPX at the selected top-level folder
 - Before scanning a first-level child directory, count supported photos in its immediate child directories; if their subtotal is greater than `1000`, scan those immediate child directories individually first and then merge them into the first-level child directory GPX
 - Use `DateTimeOriginal` first and fall back to `CreateDate`
 - Keep only files that have both timestamp and GPS coordinates
@@ -104,8 +141,8 @@ The GUI can switch between English and Traditional Chinese from the language sel
 
 ### GUI Field Guide
 
-- `Photo folder`: The folder that will be scanned. This is the main required field.
-- `Output GPX (optional)`: Where to save the GPX file. If left blank, the app creates a timestamped GPX inside the selected photo folder.
+- `Photo folder`: The top-level folder that should be scanned. The app will keep scanning downward recursively, so in most cases you should choose the parent trip/month/year folder rather than the deepest leaf folder.
+- `Output GPX (optional)`: Where to save the GPX file. If left blank, the app creates a timestamped GPX inside the selected top-level photo folder.
 - `Timezone`: Used only when photo timestamps do not already include timezone information. `Asia/Taipei` is a good default for photos taken in Taiwan.
 - `Track name (optional)`: The name stored inside the GPX track itself. This is what some apps may show after import. If left blank, the selected folder name is used.
 - `Reuse existing child GPX for yearly folders`: Useful when the selected folder is a year folder such as `2019` and some child folders have already been exported before. The app will reuse those child GPX files instead of rescanning everything.
@@ -114,6 +151,7 @@ The GUI can switch between English and Traditional Chinese from the language sel
 ### GUI Filling Tips
 
 - For most normal cases, fill only `Photo folder` and leave the rest at their defaults.
+- Choose the upper folder you want merged, not the final deepest folder, unless you only want that leaf exported.
 - Fill `Output GPX` only if you want the GPX saved somewhere else or under a specific filename.
 - Fill `Track name` only if you want a nicer display name after importing into Fog of World or another map app.
 - Turn on the two checkboxes mainly for large or repeated scans.

@@ -11,7 +11,12 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from app_version import APP_VERSION
-from build_fog_gpx import RunOptions, normalize_cli_path, run_conversion
+from build_fog_gpx import (
+    RunOptions,
+    default_output_path,
+    normalize_cli_path,
+    run_conversion,
+)
 
 
 AUTHOR_URL = "https://github.com/mickyp/photos-to-fog-of-world"
@@ -386,8 +391,7 @@ class FogGpxApp:
         normalized = input_dir.strip()
         if not normalized:
             return ""
-        selected_path = Path(normalized)
-        return str(selected_path / f"{selected_path.name}_fog_of_world.gpx")
+        return str(default_output_path(Path(normalized)))
 
     def _set_output_to_suggested_path(self, input_dir: str) -> None:
         suggested = self._build_suggested_output_path(input_dir)
@@ -458,6 +462,11 @@ class FogGpxApp:
                 self._t("msg_missing_folder_body"),
             )
             return
+
+        # Keep GUI default behavior aligned with CLI/script mode:
+        # automatic outputs always use a fresh timestamped filename.
+        if self._output_follows_input:
+            self._set_output_to_suggested_path(input_dir)
 
         self._append_log("")
         self._append_log(self._t("log_scanning", path=input_dir))
