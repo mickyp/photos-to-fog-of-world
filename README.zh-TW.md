@@ -6,7 +6,7 @@
 
 - `scripts/fog_gpx_cli.py`：命令列版
 - `scripts/fog_gpx_gui.py`：小視窗版
-- `scripts/build_windows_exe.ps1`：可打包成 `.exe` 的封裝腳本
+- `scripts/build_windows_exe.ps1`：可打包成單一 `.exe` 的封裝腳本
 
 英文說明請見：
 - [README.md](README.md)
@@ -31,7 +31,7 @@
 scoop install exiftool
 ```
 
-如果你是要封裝給別人使用，可以直接跑內建的打包腳本；它會把 `exiftool.exe` 一起放進輸出資料夾。
+如果你是要封裝給別人使用，可以直接跑內建的打包腳本；它會把 `exiftool.exe` 一起包進執行檔內。
 
 ## 輸出結果
 
@@ -129,12 +129,12 @@ GUI 視窗最上方可以切換 `正體中文` 或 `English`。
 powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
 ```
 
-完成後會得到：
+完成後預設會得到：
 
-- `dist\photos-to-gpx-cli\photos-to-gpx-cli.exe`
-- `dist\photos-to-gpx-gui\photos-to-gpx-gui.exe`
+- `dist\photos-to-gpx-cli.exe`
+- `dist\photos-to-gpx-gui.exe`
 
-這兩個資料夾內都會附上 `exiftool.exe`，所以交給別人時，不需要再另外安裝 `exiftool`。
+這兩個執行檔都已經把 `exiftool.exe` 一起包進去，所以交給別人時，只需要提供單一 `.exe`，不需要再另外安裝 `exiftool`。
 
 ## 專案內容
 

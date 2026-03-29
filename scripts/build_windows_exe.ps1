@@ -1,6 +1,7 @@
 param(
     [string]$Python = "py",
-    [string]$DistDir = "dist"
+    [string]$DistDir = "dist",
+    [switch]$OneFile = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +31,10 @@ $commonArgs = @(
     "--specpath", "build\spec",
     "--add-binary", "$exiftool;."
 )
+
+if ($OneFile) {
+    $commonArgs += "--onefile"
+}
 
 Push-Location $repoRoot
 try {

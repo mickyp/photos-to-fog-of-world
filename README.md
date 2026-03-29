@@ -23,7 +23,7 @@ If you want to share this with Windows users who do not have Python or a local c
 
 - `scripts/fog_gpx_cli.py`: a friendlier command-line entry point
 - `scripts/fog_gpx_gui.py`: a simple desktop window for choosing a folder
-- `scripts/build_windows_exe.ps1`: a packaging script that builds Windows `.exe` files and bundles `exiftool.exe`
+- `scripts/build_windows_exe.ps1`: a packaging script that builds single-file Windows `.exe` files and bundles `exiftool.exe`
 
 ### Install `exiftool` on Windows
 
@@ -127,12 +127,12 @@ Build both the CLI and GUI executables:
 powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
 ```
 
-This creates:
+By default this creates:
 
-- `dist\photos-to-gpx-cli\photos-to-gpx-cli.exe`
-- `dist\photos-to-gpx-gui\photos-to-gpx-gui.exe`
+- `dist\photos-to-gpx-cli.exe`
+- `dist\photos-to-gpx-gui.exe`
 
-The packaging script includes `exiftool.exe` beside each executable so the recipient does not need to install it separately.
+The packaging script bundles `exiftool.exe` inside each executable, so the recipient only needs a single downloaded `.exe`.
 
 ## Example Codex Prompt
 

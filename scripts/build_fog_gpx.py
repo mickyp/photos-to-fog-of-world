@@ -211,6 +211,7 @@ def ensure_exiftool_available(exiftool_cmd: str) -> None:
             capture_output=True,
             text=True,
             check=True,
+            **subprocess_window_options(),
         )
     except FileNotFoundError as exc:
         raise SystemExit("exiftool is not installed or not on PATH") from exc
@@ -248,6 +249,18 @@ def exiftool_filename_charset() -> str:
         if encoding in {"cp950", "ms950", "big5"}:
             return "cp950"
     return "utf8"
+
+
+def subprocess_window_options() -> dict:
+    if os.name != "nt":
+        return {}
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    return {
+        "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        "startupinfo": startupinfo,
+    }
 
 
 def normalize_exiftool_warning_text(warning_text: str | None) -> str | None:
@@ -294,7 +307,12 @@ def read_photo_metadata(input_dir: Path, exiftool_cmd: str) -> tuple[list[dict],
         command.extend(["-ext", extension])
     command.append(str(input_dir))
 
-    result = subprocess.run(command, capture_output=True, check=False)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        check=False,
+        **subprocess_window_options(),
+    )
     stdout_text = result.stdout.decode("utf-8", errors="replace")
     stderr_text = normalize_exiftool_warning_text(
         result.stderr.decode("utf-8", errors="replace").strip() or None
@@ -333,7 +351,12 @@ def read_photo_metadata_non_recursive(
         command.extend(["-ext", extension])
     command.append(str(input_dir))
 
-    result = subprocess.run(command, capture_output=True, check=False)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        check=False,
+        **subprocess_window_options(),
+    )
     stdout_text = result.stdout.decode("utf-8", errors="replace")
     stderr_text = normalize_exiftool_warning_text(
         result.stderr.decode("utf-8", errors="replace").strip() or None
