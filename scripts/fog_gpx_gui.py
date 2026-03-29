@@ -10,6 +10,7 @@ import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from app_version import APP_VERSION
 from build_fog_gpx import RunOptions, normalize_cli_path, run_conversion
 
 
@@ -341,7 +342,7 @@ class FogGpxApp:
         return button
 
     def _apply_language(self) -> None:
-        self.root.title(self._t("window_title"))
+        self.root.title(f"{self._t('window_title')} v{APP_VERSION}")
         self.status_var.set(self._t("status_ready"))
 
         self._widgets["language_label"].configure(text=self._t("language_label"))

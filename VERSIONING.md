@@ -59,3 +59,11 @@ Windows 打包輸出的檔名會自動加上版本號：
 
 - `photos-to-gpx-cli-v1.0.0.exe`
 - `photos-to-gpx-gui-v1.0.0.exe`
+
+## 建議釋出流程
+
+1. 修改根目錄的 `VERSION`
+2. 執行 `py scripts/generate_changelog.py`
+3. 檢查 `CHANGELOG.md`
+4. 執行打包腳本
+5. 建立對應的 release commit 與 tag
