@@ -7,6 +7,19 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$versionFile = Join-Path $repoRoot "VERSION"
+if (-not (Test-Path $versionFile)) {
+    throw "VERSION file was not found."
+}
+
+$version = (Get-Content $versionFile -Raw).Trim()
+if (-not $version) {
+    throw "VERSION file is empty."
+}
+
+$cliName = "photos-to-gpx-cli-v$version"
+$guiName = "photos-to-gpx-gui-v$version"
+
 $exiftool = & $Python -c "from scripts.build_fog_gpx import find_exiftool; print(find_exiftool())" 2>$null
 if (-not $exiftool) {
     throw "ExifTool was not found. Install it first or place exiftool.exe next to the scripts."
@@ -38,8 +51,8 @@ if ($OneFile) {
 
 Push-Location $repoRoot
 try {
-    & $Python @commonArgs --name "photos-to-gpx-cli" scripts\fog_gpx_cli.py
-    & $Python @commonArgs --windowed --name "photos-to-gpx-gui" scripts\fog_gpx_gui.py
+    & $Python @commonArgs --name $cliName scripts\fog_gpx_cli.py
+    & $Python @commonArgs --windowed --name $guiName scripts\fog_gpx_gui.py
 }
 finally {
     Pop-Location

@@ -129,10 +129,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
 
 By default this creates:
 
-- `dist\photos-to-gpx-cli.exe`
-- `dist\photos-to-gpx-gui.exe`
+- `dist\photos-to-gpx-cli-v<VERSION>.exe`
+- `dist\photos-to-gpx-gui-v<VERSION>.exe`
 
 The packaging script bundles `exiftool.exe` inside each executable, so the recipient only needs a single downloaded `.exe`.
+
+The version number comes from the repository-root `VERSION` file. Update that file before each release.
 
 ## Example Codex Prompt
 

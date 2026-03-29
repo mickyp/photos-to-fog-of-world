@@ -131,10 +131,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
 
 完成後預設會得到：
 
-- `dist\photos-to-gpx-cli.exe`
-- `dist\photos-to-gpx-gui.exe`
+- `dist\photos-to-gpx-cli-v<VERSION>.exe`
+- `dist\photos-to-gpx-gui-v<VERSION>.exe`
 
 這兩個執行檔都已經把 `exiftool.exe` 一起包進去，所以交給別人時，只需要提供單一 `.exe`，不需要再另外安裝 `exiftool`。
+
+版號會從專案根目錄的 `VERSION` 檔案讀取；每次釋出前只需要修改那個檔案即可。
 
 ## 專案內容
 
