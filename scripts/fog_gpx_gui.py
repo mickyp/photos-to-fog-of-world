@@ -120,8 +120,13 @@ class FogGpxApp:
         self._worker: threading.Thread | None = None
         self._widgets: dict[str, object] = {}
         self._language_value_to_code: dict[str, str] = {}
+        self._syncing_output = False
+        self._output_follows_input = True
+        self._last_suggested_output = ""
 
         self._build_layout()
+        self.input_var.trace_add("write", self._on_input_var_changed)
+        self.output_var.trace_add("write", self._on_output_var_changed)
         self._apply_language()
         self.root.after(150, self._poll_messages)
 
@@ -279,13 +284,57 @@ class FogGpxApp:
             self.language_var.set(code)
             self._apply_language()
 
+    def _build_suggested_output_path(self, input_dir: str) -> str:
+        normalized = input_dir.strip()
+        if not normalized:
+            return ""
+        selected_path = Path(normalized)
+        return str(selected_path / f"{selected_path.name}_fog_of_world.gpx")
+
+    def _set_output_to_suggested_path(self, input_dir: str) -> None:
+        suggested = self._build_suggested_output_path(input_dir)
+        self._syncing_output = True
+        try:
+            self.output_var.set(suggested)
+        finally:
+            self._syncing_output = False
+        self._last_suggested_output = suggested
+        self._output_follows_input = True
+
+    def _on_input_var_changed(self, *_args: object) -> None:
+        input_dir = self.input_var.get().strip()
+        current_output = self.output_var.get().strip()
+        if not input_dir:
+            if not current_output:
+                self._output_follows_input = True
+                self._last_suggested_output = ""
+            return
+
+        if not current_output or self._output_follows_input or current_output == self._last_suggested_output:
+            self._set_output_to_suggested_path(input_dir)
+
+    def _on_output_var_changed(self, *_args: object) -> None:
+        if self._syncing_output:
+            return
+
+        current_output = self.output_var.get().strip()
+        if not current_output:
+            self._output_follows_input = True
+            self._last_suggested_output = ""
+            return
+
+        suggested_output = self._build_suggested_output_path(self.input_var.get())
+        if suggested_output and current_output == suggested_output:
+            self._output_follows_input = True
+            self._last_suggested_output = current_output
+            return
+
+        self._output_follows_input = False
+
     def _choose_input(self) -> None:
         selected = filedialog.askdirectory(title=self._t("dialog_choose_input"))
         if selected:
             self.input_var.set(selected)
-            if not self.output_var.get().strip():
-                suggested = Path(selected) / f"{Path(selected).name}_fog_of_world.gpx"
-                self.output_var.set(str(suggested))
 
     def _choose_output(self) -> None:
         initial_dir = self.input_var.get().strip() or str(Path.home())

@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 build/
 dist/
+release/
+dist-release/
 
 # Local outputs
 *.gpx
