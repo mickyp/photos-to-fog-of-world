@@ -50,9 +50,10 @@ Every default output filename includes a timestamp down to seconds. This applies
 
 In normal use, choose the highest folder that represents the trip, month, or year you want to export. Do **not** drill down to the deepest leaf folder unless you intentionally want only that one leaf exported.
 
-Example:
+Recommended folder selection:
 
 ```text
+[Choose this folder]
 2024
 ├─ 01 Taipei Trip
 │  ├─ Day 1
@@ -80,6 +81,18 @@ Typical results:
 │  └─ 02-Tainan-Trip_fog_of_world_20260329-130508.gpx
 └─ 2024_fog_of_world_20260329-130520.gpx
 ```
+
+Common wrong selection:
+
+```text
+2024
+└─ 01 Taipei Trip
+   └─ [Chosen by mistake] Day 1
+      ├─ IMG_0001.JPG
+      └─ IMG_0002.JPG
+```
+
+If you choose `Day 1`, the tool will only export that leaf folder. It will not automatically know that you wanted a merged `2024` result.
 
 ## How It Works
 
