@@ -19,6 +19,12 @@ Traditional Chinese README:
 - Python 3
 - `exiftool`
 
+If you want to share this with Windows users who do not have Python or a local coding agent, this repo now also includes:
+
+- `scripts/fog_gpx_cli.py`: a friendlier command-line entry point
+- `scripts/fog_gpx_gui.py`: a simple desktop window for choosing a folder
+- `scripts/build_windows_exe.ps1`: a packaging script that builds Windows `.exe` files and bundles `exiftool.exe`
+
 ### Install `exiftool` on Windows
 
 If `exiftool` is not already available on `PATH`, install it with Scoop:
@@ -60,6 +66,12 @@ The conversion uses these rules:
 py scripts/build_fog_gpx.py "C:\path\to\photos" --timezone "Asia/Taipei"
 ```
 
+Windows-friendly CLI wrapper:
+
+```powershell
+py scripts/fog_gpx_cli.py --input "C:\path\to\photos" --timezone "Asia/Taipei"
+```
+
 Optional output override:
 
 ```powershell
@@ -72,6 +84,56 @@ Optional yearly merge that reuses existing child-directory GPX files:
 py scripts/build_fog_gpx.py "C:\path\to\2015" --timezone "Asia/Taipei" --reuse-existing-child-gpx
 ```
 
+## GUI Usage
+
+Launch the simple desktop app:
+
+```powershell
+py scripts/fog_gpx_gui.py
+```
+
+Then:
+
+1. Choose the photo folder.
+2. Optionally choose a GPX output path.
+3. Click `Export GPX`.
+
+The app shows progress and alerts you when the file is ready.
+
+The GUI can switch between English and Traditional Chinese from the language selector at the top of the window.
+
+### GUI Field Guide
+
+- `Photo folder`: The folder that will be scanned. This is the main required field.
+- `Output GPX (optional)`: Where to save the GPX file. If left blank, the app creates a timestamped GPX inside the selected photo folder.
+- `Timezone`: Used only when photo timestamps do not already include timezone information. `Asia/Taipei` is a good default for photos taken in Taiwan.
+- `Track name (optional)`: The name stored inside the GPX track itself. This is what some apps may show after import. If left blank, the selected folder name is used.
+- `Reuse existing child GPX for yearly folders`: Useful when the selected folder is a year folder such as `2019` and some child folders have already been exported before. The app will reuse those child GPX files instead of rescanning everything.
+- `Skip writing a new GPX when one already exists`: If a matching GPX already exists in the target folder, reuse it instead of creating another new file.
+
+### GUI Filling Tips
+
+- For most normal cases, fill only `Photo folder` and leave the rest at their defaults.
+- Fill `Output GPX` only if you want the GPX saved somewhere else or under a specific filename.
+- Fill `Track name` only if you want a nicer display name after importing into Fog of World or another map app.
+- Turn on the two checkboxes mainly for large or repeated scans.
+- Use the language selector at the top if the user prefers English or Traditional Chinese.
+
+## Build Windows EXEs
+
+Build both the CLI and GUI executables:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
+```
+
+This creates:
+
+- `dist\photos-to-gpx-cli\photos-to-gpx-cli.exe`
+- `dist\photos-to-gpx-gui\photos-to-gpx-gui.exe`
+
+The packaging script includes `exiftool.exe` beside each executable so the recipient does not need to install it separately.
+
 ## Example Codex Prompt
 
 ```text
@@ -83,6 +145,9 @@ Use $photos-to-fog-of-world to convert C:\path\to\photos into Fog of World GPX f
 - `SKILL.md`: Skill definition and usage instructions
 - `agents/openai.yaml`: UI metadata
 - `scripts/build_fog_gpx.py`: Conversion script
+- `scripts/fog_gpx_cli.py`: CLI wrapper for end users
+- `scripts/fog_gpx_gui.py`: GUI wrapper for end users
+- `scripts/build_windows_exe.ps1`: Windows packaging helper
 
 ## Notes
 
