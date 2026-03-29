@@ -32,6 +32,7 @@ TRANSLATIONS = {
         "timezone_hint": "只有在照片時間本身沒有時區資訊時才會用到。如果照片是在台灣拍的，通常可使用 Asia/Taipei。",
         "track_name": "軌跡名稱（可不填）",
         "track_name_hint": "可不填。這是寫進 GPX 內的名稱，匯入地圖工具後可能會顯示這個名字。若留白，會改用資料夾名稱。",
+        "options_label": "進階選項",
         "reuse_child": "年度資料夾可重用既有子資料夾 GPX",
         "skip_existing": "若已存在 GPX 就不要再建立新的",
         "options_hint": "這兩個選項主要適合大量照片或重複匯出的情況。多數使用者可以先不勾選。",
@@ -71,6 +72,7 @@ TRANSLATIONS = {
         "timezone_hint": "Used only when photo timestamps do not already include timezone data. For photos taken in Taiwan, Asia/Taipei is usually correct.",
         "track_name": "Track name (optional)",
         "track_name_hint": "Optional. This is the track title stored inside the GPX. If left blank, the selected folder name is used.",
+        "options_label": "Advanced options",
         "reuse_child": "Reuse existing child GPX for yearly folders",
         "skip_existing": "Skip writing a new GPX when one already exists",
         "options_hint": "These options are mainly useful for large or repeated exports. Most users can leave them unchecked.",
@@ -102,10 +104,80 @@ LANGUAGE_CHOICES = [
 ]
 
 
+class FieldTooltip:
+    def __init__(
+        self, root: tk.Tk, widget: ttk.Button, text_getter: callable[[], str]
+    ) -> None:
+        self.root = root
+        self.widget = widget
+        self.text_getter = text_getter
+        self.tip_window: tk.Toplevel | None = None
+        self.tip_label: ttk.Label | None = None
+        self.hide_job: str | None = None
+        self.visible = False
+
+        for sequence in ("<Enter>", "<FocusIn>"):
+            self.widget.bind(sequence, self._show, add="+")
+        for sequence in ("<Leave>", "<FocusOut>"):
+            self.widget.bind(sequence, self._schedule_hide, add="+")
+        self.widget.bind("<Button-1>", self._toggle, add="+")
+        self.widget.bind("<Escape>", self._hide, add="+")
+
+    def _tooltip_text(self) -> str:
+        return self.text_getter()
+
+    def _show(self, _event: object | None = None) -> None:
+        if self.hide_job is not None:
+            self.root.after_cancel(self.hide_job)
+            self.hide_job = None
+        text = self._tooltip_text()
+        if not text:
+            return
+
+        if self.tip_window is None:
+            self.tip_window = tk.Toplevel(self.root)
+            self.tip_window.withdraw()
+            self.tip_window.wm_overrideredirect(True)
+            self.tip_window.attributes("-topmost", True)
+            container = ttk.Frame(self.tip_window, padding=10, relief="solid", borderwidth=1)
+            container.pack(fill="both", expand=True)
+            self.tip_label = ttk.Label(container, justify="left", wraplength=320)
+            self.tip_label.pack(fill="both", expand=True)
+
+        if self.tip_label is not None:
+            self.tip_label.configure(text=text)
+
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() + 10
+        y = self.widget.winfo_rooty() - 2
+        self.tip_window.geometry(f"+{x}+{y}")
+        self.tip_window.deiconify()
+        self.visible = True
+
+    def _schedule_hide(self, _event: object | None = None) -> None:
+        if self.hide_job is not None:
+            self.root.after_cancel(self.hide_job)
+        self.hide_job = self.root.after(150, self._hide)
+
+    def _hide(self, _event: object | None = None) -> None:
+        if self.hide_job is not None:
+            self.root.after_cancel(self.hide_job)
+            self.hide_job = None
+        if self.tip_window is not None:
+            self.tip_window.withdraw()
+        self.visible = False
+
+    def _toggle(self, _event: object | None = None) -> str:
+        if self.visible:
+            self._hide()
+        else:
+            self._show()
+        return "break"
+
+
 class FogGpxApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.minsize(760, 620)
+        self.root.minsize(760, 500)
 
         self.input_var = tk.StringVar()
         self.output_var = tk.StringVar()
@@ -120,6 +192,7 @@ class FogGpxApp:
         self._worker: threading.Thread | None = None
         self._widgets: dict[str, object] = {}
         self._language_value_to_code: dict[str, str] = {}
+        self._tooltips: list[FieldTooltip] = []
         self._syncing_output = False
         self._output_follows_input = True
         self._last_suggested_output = ""
@@ -142,7 +215,7 @@ class FogGpxApp:
         frame = ttk.Frame(self.root, padding=16)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(1, weight=1)
-        frame.rowconfigure(13, weight=1)
+        frame.rowconfigure(9, weight=1)
 
         self._widgets["language_label"] = ttk.Label(frame)
         self._widgets["language_label"].grid(row=0, column=0, sticky="w", pady=(0, 6))
@@ -159,74 +232,86 @@ class FogGpxApp:
         self._widgets["intro_label"] = ttk.Label(frame, wraplength=700, justify="left")
         self._widgets["intro_label"].grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 14))
 
-        self._widgets["photo_folder_label"] = ttk.Label(frame)
-        self._widgets["photo_folder_label"].grid(row=2, column=0, sticky="w", pady=(0, 6))
+        photo_header = ttk.Frame(frame)
+        photo_header.grid(row=2, column=0, sticky="w", pady=(0, 6))
+        self._widgets["photo_folder_label"] = ttk.Label(photo_header)
+        self._widgets["photo_folder_label"].pack(side="left")
+        self._widgets["photo_folder_help"] = self._create_help_button(
+            photo_header, "photo_folder_hint"
+        )
         ttk.Entry(frame, textvariable=self.input_var).grid(
             row=2, column=1, sticky="ew", padx=(8, 8), pady=(0, 6)
         )
         self._widgets["browse_button"] = ttk.Button(frame, command=self._choose_input)
         self._widgets["browse_button"].grid(row=2, column=2, sticky="ew", pady=(0, 6))
-        self._widgets["photo_folder_hint"] = ttk.Label(frame, wraplength=700, justify="left")
-        self._widgets["photo_folder_hint"].grid(row=3, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
-        self._widgets["output_label"] = ttk.Label(frame)
-        self._widgets["output_label"].grid(row=4, column=0, sticky="w", pady=(0, 6))
+        output_header = ttk.Frame(frame)
+        output_header.grid(row=3, column=0, sticky="w", pady=(6, 6))
+        self._widgets["output_label"] = ttk.Label(output_header)
+        self._widgets["output_label"].pack(side="left")
+        self._widgets["output_help"] = self._create_help_button(output_header, "output_gpx_hint")
         ttk.Entry(frame, textvariable=self.output_var).grid(
-            row=4, column=1, sticky="ew", padx=(8, 8), pady=(0, 6)
+            row=3, column=1, sticky="ew", padx=(8, 8), pady=(6, 6)
         )
         self._widgets["save_as_button"] = ttk.Button(frame, command=self._choose_output)
-        self._widgets["save_as_button"].grid(row=4, column=2, sticky="ew", pady=(0, 6))
-        self._widgets["output_hint"] = ttk.Label(frame, wraplength=700, justify="left")
-        self._widgets["output_hint"].grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        self._widgets["save_as_button"].grid(row=3, column=2, sticky="ew", pady=(6, 6))
 
-        self._widgets["timezone_label"] = ttk.Label(frame)
-        self._widgets["timezone_label"].grid(row=6, column=0, sticky="w", pady=(0, 6))
+        timezone_header = ttk.Frame(frame)
+        timezone_header.grid(row=4, column=0, sticky="w", pady=(6, 6))
+        self._widgets["timezone_label"] = ttk.Label(timezone_header)
+        self._widgets["timezone_label"].pack(side="left")
+        self._widgets["timezone_help"] = self._create_help_button(timezone_header, "timezone_hint")
         ttk.Entry(frame, textvariable=self.timezone_var).grid(
-            row=6, column=1, sticky="ew", padx=(8, 8), pady=(0, 6)
+            row=4, column=1, sticky="ew", padx=(8, 8), pady=(6, 6)
         )
-        self._widgets["timezone_hint"] = ttk.Label(frame, wraplength=700, justify="left")
-        self._widgets["timezone_hint"].grid(row=7, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
-        self._widgets["track_name_label"] = ttk.Label(frame)
-        self._widgets["track_name_label"].grid(row=8, column=0, sticky="w", pady=(0, 6))
-        ttk.Entry(frame, textvariable=self.track_name_var).grid(
-            row=8, column=1, sticky="ew", padx=(8, 8), pady=(0, 6)
+        track_name_header = ttk.Frame(frame)
+        track_name_header.grid(row=5, column=0, sticky="w", pady=(6, 6))
+        self._widgets["track_name_label"] = ttk.Label(track_name_header)
+        self._widgets["track_name_label"].pack(side="left")
+        self._widgets["track_name_help"] = self._create_help_button(
+            track_name_header, "track_name_hint"
         )
-        self._widgets["track_name_hint"] = ttk.Label(frame, wraplength=700, justify="left")
-        self._widgets["track_name_hint"].grid(row=9, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        ttk.Entry(frame, textvariable=self.track_name_var).grid(
+            row=5, column=1, sticky="ew", padx=(8, 8), pady=(6, 6)
+        )
 
         options_frame = ttk.Frame(frame)
-        options_frame.grid(row=10, column=0, columnspan=3, sticky="w", pady=(4, 6))
+        options_frame.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(10, 8))
+        options_frame.columnconfigure(0, weight=1)
+
+        options_header = ttk.Frame(options_frame)
+        options_header.grid(row=0, column=0, sticky="w", pady=(0, 6))
+        self._widgets["options_label"] = ttk.Label(options_header)
+        self._widgets["options_label"].pack(side="left")
+        self._widgets["options_help"] = self._create_help_button(options_header, "options_hint")
 
         self._widgets["reuse_child_check"] = ttk.Checkbutton(
             options_frame,
             variable=self.reuse_child_var,
         )
-        self._widgets["reuse_child_check"].pack(anchor="w")
+        self._widgets["reuse_child_check"].grid(row=1, column=0, sticky="w")
 
         self._widgets["skip_existing_check"] = ttk.Checkbutton(
             options_frame,
             variable=self.skip_existing_var,
         )
-        self._widgets["skip_existing_check"].pack(anchor="w")
-
-        self._widgets["options_hint"] = ttk.Label(frame, wraplength=700, justify="left")
-        self._widgets["options_hint"].grid(row=11, column=0, columnspan=3, sticky="w", pady=(0, 12))
+        self._widgets["skip_existing_check"].grid(row=2, column=0, sticky="w", pady=(4, 0))
 
         actions = ttk.Frame(frame)
-        actions.grid(row=12, column=0, columnspan=3, sticky="ew", pady=(0, 12))
+        actions.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4, 12))
         actions.columnconfigure(0, weight=1)
         self._widgets["export_button"] = ttk.Button(actions, command=self._start_export)
         self._widgets["export_button"].grid(row=0, column=1, sticky="e")
 
-        self.log_text = tk.Text(frame, height=16, wrap="word", state="disabled")
-        self.log_text.grid(row=13, column=0, columnspan=3, sticky="nsew")
+        self.log_text = tk.Text(frame, height=10, wrap="word", state="disabled")
+        self.log_text.grid(row=8, column=0, columnspan=3, sticky="nsew")
 
         self._widgets["status_label"] = ttk.Label(frame, textvariable=self.status_var)
-        self._widgets["status_label"].grid(row=14, column=0, columnspan=3, sticky="w", pady=(12, 0))
+        self._widgets["status_label"].grid(row=9, column=0, columnspan=3, sticky="w", pady=(12, 0))
 
         footer = ttk.Frame(frame)
-        footer.grid(row=15, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        footer.grid(row=10, column=0, columnspan=3, sticky="w", pady=(10, 0))
         self._widgets["author_label"] = ttk.Label(footer)
         self._widgets["author_label"].pack(side="left")
         self._widgets["author_link"] = tk.Label(
@@ -239,6 +324,12 @@ class FogGpxApp:
         self._widgets["author_link"].pack(side="left")
         self._widgets["author_link"].bind("<Button-1>", self._open_author_link)
 
+    def _create_help_button(self, parent: ttk.Frame, tooltip_key: str) -> ttk.Button:
+        button = ttk.Button(parent, text="?", width=2, takefocus=True)
+        button.pack(side="left", padx=(6, 0))
+        self._tooltips.append(FieldTooltip(self.root, button, lambda key=tooltip_key: self._t(key)))
+        return button
+
     def _apply_language(self) -> None:
         self.root.title(self._t("window_title"))
         self.status_var.set(self._t("status_ready"))
@@ -247,17 +338,13 @@ class FogGpxApp:
         self._widgets["intro_label"].configure(text=self._t("intro"))
         self._widgets["photo_folder_label"].configure(text=self._t("photo_folder"))
         self._widgets["browse_button"].configure(text=self._t("browse"))
-        self._widgets["photo_folder_hint"].configure(text=self._t("photo_folder_hint"))
         self._widgets["output_label"].configure(text=self._t("output_gpx"))
         self._widgets["save_as_button"].configure(text=self._t("save_as"))
-        self._widgets["output_hint"].configure(text=self._t("output_gpx_hint"))
         self._widgets["timezone_label"].configure(text=self._t("timezone"))
-        self._widgets["timezone_hint"].configure(text=self._t("timezone_hint"))
         self._widgets["track_name_label"].configure(text=self._t("track_name"))
-        self._widgets["track_name_hint"].configure(text=self._t("track_name_hint"))
+        self._widgets["options_label"].configure(text=self._t("options_label"))
         self._widgets["reuse_child_check"].configure(text=self._t("reuse_child"))
         self._widgets["skip_existing_check"].configure(text=self._t("skip_existing"))
-        self._widgets["options_hint"].configure(text=self._t("options_hint"))
         self._widgets["export_button"].configure(text=self._t("export"))
         self._widgets["author_label"].configure(text=self._t("author_label"))
         self._widgets["author_link"].configure(text=self._t("author_name"))
