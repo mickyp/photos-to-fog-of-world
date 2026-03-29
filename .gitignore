@@ -1,6 +1,8 @@
 # Python
 __pycache__/
 *.pyc
+build/
+dist/
 
 # Local outputs
 *.gpx
