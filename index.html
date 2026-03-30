@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -54,6 +54,29 @@
     @keyframes float {
       0% { transform: translateY(0) scale(1); }
       100% { transform: translateY(-20px) scale(1.05); }
+    }
+
+    .lang-switch {
+      position: absolute;
+      top: 1.5rem;
+      right: 2rem;
+      z-index: 100;
+    }
+    .lang-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+    .lang-btn:hover {
+      background: var(--card-hover);
+      border-color: var(--primary);
     }
 
     .container {
@@ -214,20 +237,24 @@
     <div class="blob blob-2"></div>
   </div>
 
+  <div class="lang-switch">
+    <button id="lang-btn" class="lang-btn" onclick="toggleLang()">中</button>
+  </div>
+
   <div class="container">
     <header class="hero">
-      <h1 class="title">Photos to Fog of World</h1>
-      <p class="subtitle">將帶有 GPS 資訊的照片完美轉化為世界迷霧使用的 GPX 軌跡，記錄你的每一步足跡。</p>
+      <h1 class="title" data-i18n="heroTitle">Photos to Fog of World</h1>
+      <p class="subtitle" data-i18n="heroSubtitle">Transform photos with GPS data into GPX tracks for Fog of World, recording every step of your journey flawlessly.</p>
     </header>
 
     <main class="cards-grid">
       <!-- Web GPX Editor -->
       <a href="scripts/gpx_editor.html" class="card primary-card">
         <span class="card-icon">🗺️</span>
-        <h2 class="card-title">雲端 GPX 軌跡編輯器</h2>
-        <p class="card-desc">免安裝直接在瀏覽器運作的強大編輯器。載入 GPX 軌跡，在地圖上輕鬆修剪、新增節點，系統更具備「自動貼齊道路」與「地點搜尋」功能，為完美迷霧而生。</p>
+        <h2 class="card-title" data-i18n="card1Title">Web GPX Editor</h2>
+        <p class="card-desc" data-i18n="card1Desc">A powerful, installation-free editor running directly in your browser. Load GPX tracks, easily prune or add nodes, snap to roads, and search locations to build the perfect tracks for Fog of World.</p>
         <div class="card-cta">
-          立即啟動編輯器
+          <span data-i18n="card1Cta">Launch Editor</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
         </div>
       </a>
@@ -235,10 +262,10 @@
       <!-- Local Tool / GitHub Repo -->
       <a href="https://github.com/mickyp/photos-to-fog-of-world" target="_blank" class="card">
         <span class="card-icon">💻</span>
-        <h2 class="card-title">照片批次轉軌跡工具</h2>
-        <p class="card-desc">具備命令列 (CLI) 與視窗介面 (GUI) 的單機小工具，支援一鍵遞迴掃描整個資料夾的 Heic/Jpg 照片，依照拍攝時間精準生成 GPX 檔案。</p>
+        <h2 class="card-title" data-i18n="card2Title">Bulk Photo Converter Tool</h2>
+        <p class="card-desc" data-i18n="card2Desc">A standalone desktop tool with CLI and GUI support. Automatically scan entire folders of photos with GPS and generate precisely timed GPX files.</p>
         <div class="card-cta">
-          前往 GitHub 專案庫
+          <span data-i18n="card2Cta">Visit GitHub Repo</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
         </div>
       </a>
@@ -246,8 +273,58 @@
   </div>
 
   <footer class="footer">
-    <p>&copy; 2026 Photos to Fog of World. Hosted on <a href="https://pages.github.com" target="_blank">GitHub Pages</a>.</p>
+    <p><span data-i18n="footerText">&copy; 2026 Photos to Fog of World. Hosted on </span><a href="https://pages.github.com" target="_blank">GitHub Pages</a>.</p>
   </footer>
 
+  <script>
+    const i18n = {
+      en: {
+        heroTitle: "Photos to Fog of World",
+        heroSubtitle: "Transform photos with GPS data into GPX tracks for Fog of World, recording every step of your journey flawlessly.",
+        card1Title: "Web GPX Editor",
+        card1Desc: "A powerful, installation-free editor running directly in your browser. Load GPX tracks, easily prune or add nodes, snap to roads, and search locations to build the perfect tracks for Fog of World.",
+        card1Cta: "Launch Web Editor",
+        card2Title: "Bulk Photo Converter Tool",
+        card2Desc: "A standalone desktop tool with CLI and GUI support. Automatically scan entire folders of photos with GPS and generate precisely timed GPX files.",
+        card2Cta: "Visit GitHub Repo",
+        footerText: "© 2026 Photos to Fog of World. Hosted on ",
+        langBtnText: "中"
+      },
+      zh: {
+        heroTitle: "Photos to Fog of World",
+        heroSubtitle: "將帶有 GPS 資訊的照片完美轉化為世界迷霧使用的 GPX 軌跡，記錄你的每一步足跡。",
+        card1Title: "雲端 GPX 軌跡編輯器",
+        card1Desc: "免安裝直接在瀏覽器運作的強大編輯器。載入 GPX 軌跡，在地圖上輕鬆修剪、新增節點，系統更具備「自動貼齊道路」與「地點搜尋」功能，為完美迷霧而生。",
+        card1Cta: "立即啟動編輯器",
+        card2Title: "照片批次轉軌跡工具",
+        card2Desc: "具備命令列 (CLI) 與視窗介面 (GUI) 的單機小工具，支援一鍵遞迴掃描整個資料夾的 Heic/Jpg 照片，依照拍攝時間精準生成 GPX 檔案。",
+        card2Cta: "前往 GitHub 專案庫",
+        footerText: "© 2026 Photos to Fog of World. 託管於 ",
+        langBtnText: "EN"
+      }
+    };
+
+    let currentLang = 'en';
+
+    function setLang(lang) {
+      currentLang = lang;
+      const dict = i18n[lang];
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.innerText = dict[key];
+        }
+      });
+      document.getElementById('lang-btn').innerText = dict.langBtnText;
+      document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en';
+    }
+
+    function toggleLang() {
+      setLang(currentLang === 'en' ? 'zh' : 'en');
+    }
+
+    // Initialize layout default to English
+    setLang('en');
+  </script>
 </body>
 </html>
