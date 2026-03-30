@@ -765,8 +765,8 @@ function setMode(m) {
   else if (m === 'snap') mapEl.classList.add('mode-snap');
 
   // Update marker appearance
-  state.waypoints.forEach(wp => {
-    wp.marker.setIcon(makeIcon(false));
+  state.waypoints.forEach((wp, i) => {
+    wp.marker.setIcon(makeIcon(false, i + 1));
     wp.marker.draggingEnabled = m !== 'add';  // still draggable in all non-delete modes
   });
 }
@@ -810,6 +810,12 @@ function onWpClick(wp) {
   if (state.mode === 'delete') {
     removeWaypoint(wp);
   } else if (state.mode === 'pan') {
+    if (wp.marker._customPopup && wp.marker._customPopup.isOpen()) {
+      map.closePopup(wp.marker._customPopup);
+      wp.marker._customPopup = null;
+      return;
+    }
+
     const tsStr = wp.time ? new Date(wp.time).toLocaleString() : (lang === 'zh' ? '無時間資訊' : 'No time info');
     const eleStr = wp.ele !== null ? wp.ele.toFixed(1) + ' m' : (lang === 'zh' ? '無高度' : 'N/A');
     const content = `
@@ -822,7 +828,10 @@ function onWpClick(wp) {
         <div style="color:#888; font-size:11px; margin-top:4px;">📍 ${wp.lat.toFixed(5)}, ${wp.lon.toFixed(5)}</div>
       </div>
     `;
-    wp.marker.bindPopup(content, { closeButton: false, offset: [0, -6] }).openPopup();
+    wp.marker._customPopup = L.popup({ closeButton: false, offset: [0, -6] })
+      .setLatLng([wp.lat, wp.lon])
+      .setContent(content)
+      .openOn(map);
   } else if (state.mode === 'snap') {
     if (state.snapFirst < 0) {
       // Select first
