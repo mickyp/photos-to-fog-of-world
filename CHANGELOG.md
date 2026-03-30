@@ -4,7 +4,17 @@
 
 ## [Unreleased]
 
-- 尚未整理新的未釋出變更。
+### Added
+
+- `.cursorrules`：加入專案特定的開發指令與 commit 中文撰寫規範。
+- `gpx_editor.html`：於介面上方顯示目前載入的 GPX 檔名。
+- `gpx_editor.html`：在「平移」模式點擊節點時，顯示包含時間、高度與座標的資訊視窗。
+
+### Changed
+
+- `gpx_editor.html`：優化 GPX 匯出邏輯，僅針對人工標記的「道路路線」以每 5 公尺為單位補點，原始軌跡與直線維持原狀。
+- `gpx_editor.html`：預設以原始檔名附加 `_enhanced.gpx` 匯出，移除手動輸入檔名欄位。
+- `gpx_editor.html`：放大節點標記圖示（20px 改為 24px）以支援完整顯示三位數字。
 
 ## [1.0.0] - 2026-03-29
 

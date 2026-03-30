@@ -218,11 +218,11 @@
 
     /* ── Waypoint markers (via Leaflet DivIcon) ── */
     .wp-marker {
-      width: 20px; height: 20px; border-radius: 50%;
+      width: 24px; height: 24px; border-radius: 50%;
       background: var(--orange); border: 2.5px solid #fff;
       box-shadow: 0 2px 6px rgba(0,0,0,0.5);
       display: flex; align-items: center; justify-content: center;
-      font-size: 8px; font-weight: 700; color: #fff; line-height: 1;
+      font-size: 9px; font-weight: 700; color: #fff; line-height: 1;
       font-family: 'Inter', system-ui, sans-serif;
       cursor: pointer; transition: all 0.12s ease; user-select: none;
     }
@@ -256,6 +256,7 @@
     </div>
   </div>
   <div class="header-spacer"></div>
+  <div id="file-info" style="font-size: 12px; color: var(--text-muted); background: var(--surface); padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none;" title=""></div>
   <div class="legend">
     <div class="legend-item">
       <div class="legend-dot" style="background:#ef4444;opacity:0.7"></div>
@@ -350,7 +351,6 @@
 
 <!-- ═══════════════════════════════ EXPORT ═══════════════════════════════ -->
 <div id="export-panel" class="glass">
-  <input type="text" id="track-name" data-i18n-placeholder="trackNamePlaceholder" placeholder="輸入軌跡名稱" />
   <button id="btn-export" class="btn btn-primary">
     <span>💾</span><span data-i18n="exportGPX">匯出 GPX</span>
   </button>
@@ -389,7 +389,7 @@ const STRINGS = {
     statsTitle: '統計資訊',
     statWaypoints: '節點數',
     statDistance: '總距離',
-    statPoints: '預估點數 (3m)',
+    statPoints: '預估點數 (5m)',
     statRoad: '道路段數',
     snapStep1: '點選第一個節點',
     snapStep2: '點選第二個節點（可跨節點，中間的會自動移除）',
@@ -429,7 +429,7 @@ const STRINGS = {
     statsTitle: 'Statistics',
     statWaypoints: 'Waypoints',
     statDistance: 'Total Distance',
-    statPoints: 'Est. Points (3m)',
+    statPoints: 'Est. Points (5m)',
     statRoad: 'Road Segments',
     snapStep1: 'Click the first waypoint',
     snapStep2: 'Click the second waypoint (intermediates will be removed)',
@@ -487,6 +487,7 @@ const state = {
   snapFirst: -1,     // index of first selected wp in snap mode
   snapProfile: 'foot', // 'driving' | 'cycling' | 'foot' | 'straight'
   history: [],     // undo stack: [{waypoints snapshot, segments snapshot}]
+  originalFilename: '',
 };
 
 // ════════════════════════════════════════════════════════════════════════
@@ -522,12 +523,12 @@ function initMap() {
 // ════════════════════════════════════════════════════════════════════════
 function makeIcon(selected = false, num = '') {
   const cls = selected ? 'wp-marker selected' : 'wp-marker';
-  const label = num === '' ? '' : (num > 999 ? '···' : num > 99 ? String(num).slice(0,2)+'·' : num);
+  const label = num === '' ? '' : (num > 999 ? '···' : num);
   return L.divIcon({
     className: '',
     html: `<div class="${cls}">${label}</div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
   });
 }
 
@@ -595,6 +596,7 @@ function clearAll(confirm_ = true) {
     map.removeLayer(state.originalLayer);
     state.originalLayer = null;
   }
+  document.getElementById('file-info').style.display = 'none';
   updateStats();
   showStatus(t('statusCleared'), 'info', 2000);
 }
@@ -645,11 +647,16 @@ function updateStats() {
 
   // Total distance
   let totalM = 0;
+  let estimatedPts = state.waypoints.length;
   for (let i = 0; i < state.waypoints.length - 1; i++) {
     const seg = state.segments[i];
     if (seg?.type === 'road' && seg.pts?.length > 1) {
-      for (let j = 0; j < seg.pts.length - 1; j++)
-        totalM += haversine(seg.pts[j].lat, seg.pts[j].lon, seg.pts[j+1].lat, seg.pts[j+1].lon);
+      let segDist = 0;
+      for (let j = 0; j < seg.pts.length - 1; j++) {
+        segDist += haversine(seg.pts[j].lat, seg.pts[j].lon, seg.pts[j+1].lat, seg.pts[j+1].lon);
+      }
+      totalM += segDist;
+      estimatedPts += Math.floor(segDist / 5);
     } else {
       const a = state.waypoints[i], b = state.waypoints[i+1];
       totalM += haversine(a.lat, a.lon, b.lat, b.lon);
@@ -658,7 +665,7 @@ function updateStats() {
 
   document.getElementById('stat-dist').textContent =
     totalM >= 1000 ? (totalM/1000).toFixed(2) + ' km' : Math.round(totalM) + ' m';
-  document.getElementById('stat-pts').textContent = '~' + Math.ceil(totalM / 3).toLocaleString();
+  document.getElementById('stat-pts').textContent = '~' + estimatedPts.toLocaleString();
   document.getElementById('stat-segs').textContent =
     state.segments.filter(s => s?.type === 'road').length;
 }
@@ -752,6 +759,20 @@ function onWpClick(wp) {
   const idx = state.waypoints.indexOf(wp);
   if (state.mode === 'delete') {
     removeWaypoint(wp);
+  } else if (state.mode === 'pan') {
+    const tsStr = wp.time ? new Date(wp.time).toLocaleString() : (lang === 'zh' ? '無時間資訊' : 'No time info');
+    const eleStr = wp.ele !== null ? wp.ele.toFixed(1) + ' m' : (lang === 'zh' ? '無高度' : 'N/A');
+    const content = `
+      <div style="font-size:13px; line-height:1.5; color:#333; min-width:140px;">
+        <div style="font-weight:600; margin-bottom:4px; border-bottom:1px solid #ddd; padding-bottom:4px;">
+          ${lang === 'zh' ? '節點資訊' : 'Waypoint Info'} <span style="color:#666;font-size:11px;">#${idx + 1}</span>
+        </div>
+        <div><b>🕒</b> ${tsStr}</div>
+        <div><b>⛰️</b> ${eleStr}</div>
+        <div style="color:#888; font-size:11px; margin-top:4px;">📍 ${wp.lat.toFixed(5)}, ${wp.lon.toFixed(5)}</div>
+      </div>
+    `;
+    wp.marker.bindPopup(content, { closeButton: false, offset: [0, -6] }).openPopup();
   } else if (state.mode === 'snap') {
     if (state.snapFirst < 0) {
       // Select first
@@ -878,9 +899,16 @@ function loadGPXText(text, filename) {
 
   clearAll(false);
 
-  // Set track name
-  if (trackName) document.getElementById('track-name').value = trackName;
-  else if (filename) document.getElementById('track-name').value = filename.replace(/\.gpx$/i, '');
+  state.originalFilename = filename || '';
+
+  const fileInfoEl = document.getElementById('file-info');
+  if (filename) {
+    fileInfoEl.textContent = '📄 ' + filename;
+    fileInfoEl.title = filename;
+    fileInfoEl.style.display = 'block';
+  } else {
+    fileInfoEl.style.display = 'none';
+  }
 
   // Show original reference track
   const origLatLngs = points.map(p => [p.lat, p.lon]);
@@ -933,83 +961,68 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-// Build full raw path [{lat,lon,time}] from waypoints + segments
-function buildFullPath() {
+// Build the export path: apply 5m interpolation ONLY to road segments
+function buildExportPath() {
   if (!state.waypoints.length) return [];
-  const path = [];
-  for (let i = 0; i < state.waypoints.length; i++) {
-    const wp = state.waypoints[i];
-    if (i < state.waypoints.length - 1) {
-      const seg = state.segments[i];
-      if (seg?.type === 'road' && seg.pts?.length > 1) {
-        // Add all road pts except the last (will be added by next wp iteration)
-        for (let j = 0; j < seg.pts.length - 1; j++) {
-          path.push({ lat: seg.pts[j].lat, lon: seg.pts[j].lon, time: j === 0 ? wp.time : null });
-        }
-      } else {
-        path.push({ lat: wp.lat, lon: wp.lon, time: wp.time });
-      }
-    } else {
-      path.push({ lat: wp.lat, lon: wp.lon, time: wp.time });
-    }
-  }
-  return path;
-}
-
-// Interpolate path at `interval` metres
-function interpolateEvery(path, interval = 3) {
-  if (path.length < 2) return path.map(p => ({ ...p, cumDist: 0 }));
-
-  // Compute cumulative distances
-  const cum = [0];
-  for (let i = 1; i < path.length; i++)
-    cum.push(cum[i-1] + haversine(path[i-1].lat, path[i-1].lon, path[i].lat, path[i].lon));
-  const totalDist = cum[cum.length - 1];
-
   const result = [];
-  let target = 0;
-  let si = 0; // segment index
-
-  while (target <= totalDist) {
-    // Advance segment
-    while (si < path.length - 2 && cum[si+1] < target) si++;
-
-    let lat, lon;
-    if (si >= path.length - 1 || cum[si+1] === cum[si]) {
-      lat = path[si].lat; lon = path[si].lon;
-    } else {
-      const t = (target - cum[si]) / (cum[si+1] - cum[si]);
-      lat = path[si].lat + t * (path[si+1].lat - path[si].lat);
-      lon = path[si].lon + t * (path[si+1].lon - path[si].lon);
-    }
-    result.push({ lat, lon, cumDist: target, time: null });
-
-    if (target === totalDist) break;
-    target = Math.min(target + interval, totalDist);
-  }
-  return result;
-}
-
-// Assign timestamps (linear interpolation between timed anchors)
-function assignTimestamps(interpPts, rawPath) {
-  // Build anchors from rawPath (points with times + their cumDist)
-  const rawCum = [0];
-  for (let i = 1; i < rawPath.length; i++)
-    rawCum.push(rawCum[i-1] + haversine(rawPath[i-1].lat, rawPath[i-1].lon, rawPath[i].lat, rawPath[i].lon));
-
+  let currentDist = 0;
   const anchors = [];
-  rawPath.forEach((p, i) => {
-    if (p.time instanceof Date && !isNaN(p.time)) anchors.push({ d: rawCum[i], t: p.time.getTime() });
-  });
 
-  if (!anchors.length) return interpPts; // No timestamps
+  for (let i = 0; i < state.waypoints.length - 1; i++) {
+    const wA = state.waypoints[i];
+    const wB = state.waypoints[i + 1];
+    const seg = state.segments[i];
 
-  return interpPts.map(pt => {
-    const d = pt.cumDist;
-    // Find surrounding anchors
+    if (i === 0) {
+      result.push({ lat: wA.lat, lon: wA.lon, cumDist: 0 });
+      if (wA.time) anchors.push({ d: 0, t: wA.time.getTime() });
+    }
+
+    if (seg?.type === 'road' && seg.pts?.length > 1) {
+      const cum = [0];
+      for (let k = 1; k < seg.pts.length; k++) {
+        cum.push(cum[k-1] + haversine(seg.pts[k-1].lat, seg.pts[k-1].lon, seg.pts[k].lat, seg.pts[k].lon));
+      }
+      const totalDist = cum[cum.length - 1];
+      
+      let target = 0;
+      let si = 0;
+      const roadPts = [];
+      while (target <= totalDist) {
+        while (si < seg.pts.length - 2 && cum[si+1] < target) si++;
+        let lat, lon;
+        if (si >= seg.pts.length - 1 || cum[si+1] === cum[si]) {
+          lat = seg.pts[si].lat; lon = seg.pts[si].lon;
+        } else {
+          const t = (target - cum[si]) / (cum[si+1] - cum[si]);
+          lat = seg.pts[si].lat + t * (seg.pts[si+1].lat - seg.pts[si].lat);
+          lon = seg.pts[si].lon + t * (seg.pts[si+1].lon - seg.pts[si].lon);
+        }
+        roadPts.push({ lat, lon, cumDist: target });
+        if (target === totalDist) break;
+        target = Math.min(target + 5, totalDist);
+      }
+      
+      for (let j = 1; j < roadPts.length; j++) {
+        result.push({ lat: roadPts[j].lat, lon: roadPts[j].lon, cumDist: currentDist + roadPts[j].cumDist });
+      }
+      currentDist += roadPts[roadPts.length - 1].cumDist;
+    } else {
+      const dist = haversine(wA.lat, wA.lon, wB.lat, wB.lon);
+      currentDist += dist;
+      result.push({ lat: wB.lat, lon: wB.lon, cumDist: currentDist });
+    }
+
+    if (wB.time) anchors.push({ d: currentDist, t: wB.time.getTime() });
+  }
+
+  // Assign timestamps
+  if (!anchors.length) return result.map(p => ({ ...p, time: null }));
+
+  return result.map(pt => {
     let before = anchors[0], after = anchors[anchors.length - 1];
     for (let i = 0; i < anchors.length - 1; i++) {
-      if (anchors[i].d <= d && anchors[i+1].d >= d) {
+      if (anchors[i].d <= pt.cumDist && anchors[i+1].d >= pt.cumDist) {
         before = anchors[i]; after = anchors[i+1]; break;
       }
     }
@@ -1017,7 +1030,7 @@ function assignTimestamps(interpPts, rawPath) {
     if (before.d === after.d) {
       timeMs = before.t;
     } else {
-      const ratio = (d - before.d) / (after.d - before.d);
+      const ratio = (pt.cumDist - before.d) / (after.d - before.d);
       timeMs = before.t + ratio * (after.t - before.t);
     }
     return { ...pt, time: new Date(timeMs) };
@@ -1041,11 +1054,9 @@ function exportGPX() {
   showStatus(t('statusExporting'), 'info', 0, true);
 
   setTimeout(() => {
-    const raw = buildFullPath();
-    const interp = interpolateEvery(raw, 3);
-    const withTime = assignTimestamps(interp, raw);
-
-    const name = escXml(document.getElementById('track-name').value.trim() || 'Edited Track');
+    const withTime = buildExportPath();
+    const baseName = (state.originalFilename || 'edited_track.gpx').replace(/\.gpx$/i, '');
+    const name = escXml(baseName);
     const NS = 'http://www.topografix.com/GPX/1/1';
     const XSI = 'http://www.w3.org/2001/XMLSchema-instance';
 
@@ -1070,12 +1081,9 @@ function exportGPX() {
 
     const blob = new Blob([lines.join('\n')], { type: 'application/gpx+xml' });
     const url = URL.createObjectURL(blob);
-    const baseName = (document.getElementById('track-name').value.trim() || 'edited_track')
-      .replace(/[<>:"/\\|?*]/g, '_');
-    const ts = new Date().toISOString().slice(0,19).replace(/[-:T]/g, m => m === 'T' ? '-' : m);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${baseName}_fog_of_world_${ts}.gpx`;
+    a.download = `${baseName}_enhanced.gpx`;
     a.click();
     URL.revokeObjectURL(url);
     showStatus(t('statusExported'), 'success', 3000);

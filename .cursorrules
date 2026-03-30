@@ -1,0 +1,7 @@
+# General Environment Rules
+
+- The user operates on Windows 11.
+- All terminal commands and scripts must be run using PowerShell syntax by default.
+- Do NOT use Linux-specific terminal commands (like `rm -rf`, `ls`, `grep`, `cat` directly via shell) unless executing them through a tool that specifically encapsulates them. Instead, use their PowerShell equivalents (like `Remove-Item`, `Get-ChildItem`, `Select-String`, `Get-Content`) when instructed to write terminal commands.
+- 每當程式碼有異動和修改時，都必須產生中文說明的 git commit。
+- 每次修改後，必須視需要主動去更新相關的文件（例如 README 或 CHANGELOG）。
