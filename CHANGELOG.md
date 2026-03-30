@@ -11,8 +11,10 @@
 - `gpx_editor.html`：於介面上方顯示目前載入的 GPX 檔名。
 - `gpx_editor.html`：在「平移」模式點擊節點時，顯示包含時間、高度與座標的資訊視窗。
 
-### Changed
+### Added
+- `index.html`：新增專案的 GitHub Pages 入口網頁，提供導覽至 GPX 軌跡編輯器與轉換工具專案庫的連結與精美視覺設計。
 
+### Changed
 - `gpx_editor.html`：放大左側工具列的按鈕圖示與標籤字體大小，提升閱讀舒適度。
 - `gpx_editor.html`：整體視覺對比度提升，包含拉大背景不透明度、亮化次要文字顏色。
 - `gpx_editor.html`：搜尋結果清單改為深色不透明背景，以改善可讀性。
