@@ -235,6 +235,40 @@
     @keyframes wpPulse { 0%,100%{box-shadow:0 0 0 4px rgba(168,85,247,0.4),0 2px 8px rgba(0,0,0,0.5)}50%{box-shadow:0 0 0 7px rgba(168,85,247,0.2),0 2px 8px rgba(0,0,0,0.5)} }
     .wp-marker.delete-mode:hover { background: var(--red); transform: scale(1.3); }
 
+    /* ── Search UI ── */
+    .search-container { position: relative; margin-right: 16px; font-family: 'Inter', system-ui, sans-serif; }
+    .search-box {
+      display: flex; align-items: center; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px;
+      transition: border-color 0.2s;
+    }
+    .search-box:focus-within { border-color: var(--accent); }
+    .search-box input {
+      background: transparent; border: none; color: var(--text); font-size: 13px;
+      width: 140px; outline: none; transition: width 0.2s;
+    }
+    .search-box input:focus { width: 180px; }
+    .search-box button {
+      background: transparent; border: none; color: var(--text-muted); padding: 0 4px;
+      cursor: pointer; display: none; font-size: 14px;
+    }
+    .search-box button:hover { color: var(--text); }
+    #loc-search-results {
+      position: absolute; top: calc(100% + 4px); right: 0; width: 260px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      margin: 0; padding: 4px 0; list-style: none; max-height: 250px; overflow-y: auto;
+      z-index: 2000; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none;
+    }
+    #loc-search-results li {
+      padding: 8px 12px; font-size: 12px; cursor: pointer; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    #loc-search-results li:last-child { border-bottom: none; }
+    #loc-search-results li:hover { background: var(--surface-hover); }
+    .res-name { font-weight: 600; color: var(--text); }
+    .res-addr { color: var(--text-muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .search-loading { padding: 8px 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
+
     /* ── Leaflet overrides ── */
     .leaflet-control-attribution { font-size: 10px !important; }
     .leaflet-control-zoom a {
@@ -256,6 +290,16 @@
     </div>
   </div>
   <div class="header-spacer"></div>
+
+  <div id="search-container" class="search-container">
+    <div class="search-box">
+      <span style="font-size:14px; margin-right:4px;">🔍</span>
+      <input type="text" id="loc-search-input" data-i18n-placeholder="searchLoc" placeholder="搜尋地點..." autocomplete="off">
+      <button id="loc-search-clear">✕</button>
+    </div>
+    <ul id="loc-search-results"></ul>
+  </div>
+
   <div id="file-info" style="font-size: 12px; color: var(--text-muted); background: var(--surface); padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none;" title=""></div>
   <div class="legend">
     <div class="legend-item">
@@ -391,6 +435,9 @@ const STRINGS = {
     statDistance: '總距離',
     statPoints: '預估點數 (5m)',
     statRoad: '道路段數',
+    searchLoc: '搜尋地點...',
+    searchLoading: '搜尋中...',
+    searchNoResults: '找不到結果',
     snapStep1: '點選第一個節點',
     snapStep2: '點選第二個節點（可跨節點，中間的會自動移除）',
     statusSameWp: '請選擇不同的節點',
@@ -431,6 +478,9 @@ const STRINGS = {
     statDistance: 'Total Distance',
     statPoints: 'Est. Points (5m)',
     statRoad: 'Road Segments',
+    searchLoc: 'Search location...',
+    searchLoading: 'Searching...',
+    searchNoResults: 'No results found',
     snapStep1: 'Click the first waypoint',
     snapStep2: 'Click the second waypoint (intermediates will be removed)',
     statusSameWp: 'Please select a different waypoint',
@@ -1135,6 +1185,100 @@ function undo() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+//  Location Search (Nominatim)
+// ════════════════════════════════════════════════════════════════════════
+let searchTimeout = null;
+let searchMarker = null;
+
+function initSearch() {
+  const input = document.getElementById('loc-search-input');
+  const clearBtn = document.getElementById('loc-search-clear');
+  const resultsList = document.getElementById('loc-search-results');
+
+  input.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (val) {
+      clearBtn.style.display = 'block';
+      clearTimeout(searchTimeout);
+      resultsList.style.display = 'block';
+      resultsList.innerHTML = `<div class="search-loading">${t('searchLoading') || '搜尋中...'}</div>`;
+      searchTimeout = setTimeout(() => doSearch(val), 600);
+    } else {
+      clearBtn.style.display = 'none';
+      resultsList.style.display = 'none';
+      clearTimeout(searchTimeout);
+    }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    clearBtn.style.display = 'none';
+    resultsList.style.display = 'none';
+    if (searchMarker) {
+      map.removeLayer(searchMarker);
+      searchMarker = null;
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#search-container')) {
+      resultsList.style.display = 'none';
+    }
+  });
+
+  map.on('click', () => {
+    if (searchMarker) {
+      map.removeLayer(searchMarker);
+      searchMarker = null;
+    }
+  });
+}
+
+async function doSearch(query) {
+  const resultsList = document.getElementById('loc-search-results');
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&accept-language=${lang === 'zh' ? 'zh-TW' : 'en'}`);
+    const data = await res.json();
+    
+    if (!data || data.length === 0) {
+      resultsList.innerHTML = `<div class="search-loading">${t('searchNoResults') || '找不到結果'}</div>`;
+      return;
+    }
+
+    resultsList.innerHTML = '';
+    data.forEach(item => {
+      const li = document.createElement('li');
+      const nameStr = item.name || item.display_name.split(',')[0];
+      li.innerHTML = `
+        <div class="res-name">${escXml(nameStr)}</div>
+        <div class="res-addr" title="${escXml(item.display_name)}">${escXml(item.display_name)}</div>
+      `;
+      li.addEventListener('click', () => {
+        resultsList.style.display = 'none';
+        flyToLocation(item.lat, item.lon, item.display_name);
+      });
+      resultsList.appendChild(li);
+    });
+  } catch (err) {
+    resultsList.innerHTML = `<div class="search-loading">Search Error</div>`;
+  }
+}
+
+function flyToLocation(lat, lon, title) {
+  lat = parseFloat(lat);
+  lon = parseFloat(lon);
+  map.flyTo([lat, lon], 16, { animate: true, duration: 1.5 });
+  
+  if (searchMarker) map.removeLayer(searchMarker);
+  
+  const iconHtml = `<div style="width:20px;height:20px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(59,130,246,0.3),0 2px 8px rgba(0,0,0,0.5);animation:wpPulse 1.5s infinite;"></div>`;
+  const customIcon = L.divIcon({ className: '', html: iconHtml, iconSize: [20,20], iconAnchor: [10,10] });
+  
+  searchMarker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+  searchMarker.bindTooltip(title, { permanent: false, direction: 'top', offset: [0, -10] }).openTooltip();
+}
+
+// ════════════════════════════════════════════════════════════════════════
 //  Drag & drop file handling
 // ════════════════════════════════════════════════════════════════════════
 function setupDragDrop() {
@@ -1174,6 +1318,7 @@ function init() {
   initMap();
   applyLang();
   setupDragDrop();
+  initSearch();
 
   // Language toggle
   document.getElementById('btn-lang').addEventListener('click', () => {

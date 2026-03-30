@@ -6,6 +6,7 @@
 
 ### Added
 
+- `gpx_editor.html`：新增地點與門牌搜尋框（使用 OpenStreetMap Nominatim API），點擊結果後可將畫面飛向定位點並顯示臨時標記。
 - `.cursorrules`：加入專案特定的開發指令與 commit 中文撰寫規範。
 - `gpx_editor.html`：於介面上方顯示目前載入的 GPX 檔名。
 - `gpx_editor.html`：在「平移」模式點擊節點時，顯示包含時間、高度與座標的資訊視窗。
