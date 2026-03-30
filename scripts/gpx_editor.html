@@ -13,11 +13,11 @@
 
     :root {
       --bg: #0a0b1a;
-      --surface: rgba(255,255,255,0.06);
-      --surface-hover: rgba(255,255,255,0.1);
-      --border: rgba(255,255,255,0.12);
-      --text: #e2e8f0;
-      --text-muted: #94a3b8;
+      --surface: rgba(255,255,255,0.12);
+      --surface-hover: rgba(255,255,255,0.18);
+      --border: rgba(255,255,255,0.15);
+      --text: #f1f5f9;
+      --text-muted: #cbd5e1;
       --accent: #00d4ff;
       --accent-dim: rgba(0,212,255,0.15);
       --purple: #a855f7;
@@ -101,7 +101,9 @@
       left: 12px;
       z-index: 500;
       padding: 8px;
-      display: flex; flex-direction: column; gap: 4px; min-width: 52px;
+      display: flex; flex-direction: column; gap: 4px; min-width: 56px;
+      background: rgba(15, 16, 35, 0.85); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     .tool-btn {
       width: 40px; height: 40px;
@@ -125,6 +127,8 @@
       z-index: 500;
       padding: 14px 16px;
       min-width: 180px;
+      background: rgba(15, 16, 35, 0.85); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     .stats-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
     .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; }
@@ -255,7 +259,7 @@
     .search-box button:hover { color: var(--text); }
     #loc-search-results {
       position: absolute; top: calc(100% + 4px); right: 0; width: 260px;
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: rgba(15, 16, 35, 0.95); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: var(--radius-sm);
       margin: 0; padding: 4px 0; list-style: none; max-height: 250px; overflow-y: auto;
       z-index: 2000; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none;
     }
@@ -851,17 +855,8 @@ function onWpClick(wp) {
         return;
       }
 
-      // Remove intermediate waypoints between lo and hi, then snap lo→(lo+1)
-      let currentHi = hi;
-      while (currentHi - lo > 1) {
-        const removeAt = lo + 1;
-        map.removeLayer(state.waypoints[removeAt].marker);
-        state.waypoints.splice(removeAt, 1);
-        // Merge the two segments around the removed waypoint into one straight
-        state.segments.splice(lo, 2, { type: 'straight', pts: [] });
-        currentHi--;
-      }
-      doRoadSnap(lo);
+      // Snap each segment between lo and hi without deleting intermediate waypoints
+      doRoadSnapRange(lo, hi);
     }
   }
 }
@@ -869,14 +864,13 @@ function onWpClick(wp) {
 // ════════════════════════════════════════════════════════════════════════
 //  OSRM road snap
 // ════════════════════════════════════════════════════════════════════════
-async function doRoadSnap(segIdx) {
-  const wA = state.waypoints[segIdx];
-  const wB = state.waypoints[segIdx + 1];
+async function doRoadSnapRange(lo, hi) {
   const profile = state.snapProfile;
 
-  // Straight line mode – no routing needed
   if (profile === 'straight') {
-    state.segments[segIdx] = { type: 'straight', profile: 'straight', pts: [] };
+    for (let i = lo; i < hi; i++) {
+      state.segments[i] = { type: 'straight', profile: 'straight', pts: [] };
+    }
     redrawPath();
     updateStats();
     showStatus(t('statusSnapDone'), 'success', 2000);
@@ -884,20 +878,37 @@ async function doRoadSnap(segIdx) {
   }
 
   const profileLabels = { driving: '🚗', cycling: '🚲', foot: '🚶' };
-  showStatus(`${profileLabels[profile] || ''} ${t('statusFetching')}`, 'info', 0, true);
+  showStatus(`${profileLabels[profile] || ''} ${t('statusFetching')} (${hi - lo})`, 'info', 0, true);
+  
   try {
-    const pts = await fetchOsrmRoute(wA.lat, wA.lon, wB.lat, wB.lon, profile);
-    if (pts && pts.length > 1) {
-      state.segments[segIdx] = { type: 'road', profile, pts };
+    const promises = [];
+    for (let i = lo; i < hi; i++) {
+       const wA = state.waypoints[i];
+       const wB = state.waypoints[i + 1];
+       promises.push(fetchOsrmRoute(wA.lat, wA.lon, wB.lat, wB.lon, profile));
+    }
+    const results = await Promise.all(promises);
+    
+    let allSuccess = true;
+    for (let i = 0; i < results.length; i++) {
+      const pts = results[i];
+      if (pts && pts.length > 1) {
+        state.segments[lo + i] = { type: 'road', profile, pts };
+      } else {
+        state.segments[lo + i] = { type: 'straight', profile: 'straight', pts: [] };
+        allSuccess = false;
+      }
+    }
+
+    if (allSuccess) {
       showStatus(t('statusSnapDone'), 'success', 2500);
     } else {
-      state.segments[segIdx] = { type: 'straight', profile: 'straight', pts: [] };
       showStatus(t('statusNoRoute'), 'warn', 3000);
     }
   } catch {
-    state.segments[segIdx] = { type: 'straight', profile: 'straight', pts: [] };
     showStatus(t('statusNoRoute'), 'warn', 3000);
   }
+  
   redrawPath();
   updateStats();
 }
@@ -1273,6 +1284,18 @@ async function doSearch(query) {
   }
 }
 
+window.handleAddSearchWp = function(lat, lon) {
+  if (searchMarker) {
+    map.removeLayer(searchMarker);
+    searchMarker = null;
+  }
+  const insertAfter = findNearestSegment(lat, lon);
+  addWaypoint(lat, lon, new Date().toISOString(), null, insertAfter);
+  redrawPath();
+  updateStats();
+  refreshMarkerIcons();
+};
+
 function flyToLocation(lat, lon, title) {
   lat = parseFloat(lat);
   lon = parseFloat(lon);
@@ -1284,7 +1307,17 @@ function flyToLocation(lat, lon, title) {
   const customIcon = L.divIcon({ className: '', html: iconHtml, iconSize: [20,20], iconAnchor: [10,10] });
   
   searchMarker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
-  searchMarker.bindTooltip(title, { permanent: false, direction: 'top', offset: [0, -10] }).openTooltip();
+  
+  const uiStr = lang === 'zh' ? '➕ 將此地點新增為軌跡節點' : '➕ Add as Waypoint';
+  const popupContent = `
+    <div style="font-weight:600; font-size:13px; margin-bottom:8px; line-height:1.4; color:#333; max-width:200px;">
+      ${escXml(title)}
+    </div>
+    <button style="width:100%; padding:8px; background:#3b82f6; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer; font-size:12px;" onclick="window.handleAddSearchWp(${lat}, ${lon})">
+      ${uiStr}
+    </button>
+  `;
+  searchMarker.bindPopup(popupContent, { closeButton: false, offset: [0, -6] }).openPopup();
 }
 
 // ════════════════════════════════════════════════════════════════════════
