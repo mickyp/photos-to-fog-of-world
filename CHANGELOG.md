@@ -6,6 +6,7 @@
 
 ### Added
 
+- `.cursor/rules/commit-and-docs-zh.mdc`：專案層級規則，要求實質異動後以繁體中文撰寫 commit，並依變更範圍更新或新增文件（如 CHANGELOG、GPX_EDITOR、`docs/`）。
 - `gpx_editor.html`：新增地點與門牌搜尋框（使用 OpenStreetMap Nominatim API），點擊結果後可將畫面飛向定位點並顯示臨時標記。
 - `.cursorrules`：加入專案特定的開發指令與 commit 中文撰寫規範。
 - `gpx_editor.html`：於介面上方顯示目前載入的 GPX 檔名。
@@ -16,6 +17,7 @@
 - `index.html`：加入中/英雙語切換按鈕，並預設顯示為英文介面。
 
 ### Changed
+- `.cursorrules`：補充與 `.cursor/rules/commit-and-docs-zh.mdc` 的連結，明訂繁體中文 commit 與文件／`docs/` 維護原則。
 - `gpx_editor.html`：放大左側工具列的按鈕圖示與標籤字體大小，提升閱讀舒適度。
 - `gpx_editor.html`：整體視覺對比度提升，包含拉大背景不透明度、亮化次要文字顏色。
 - `gpx_editor.html`：搜尋結果清單改為深色不透明背景，以改善可讀性。
