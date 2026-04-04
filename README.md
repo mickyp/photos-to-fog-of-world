@@ -4,6 +4,8 @@ Convert a folder of geotagged photos into Fog of World compatible `GPX` tracks.
 
 The project scans photos recursively, extracts timestamps and GPS coordinates from EXIF metadata, sorts usable points by capture time, and writes `GPX` files that Fog of World can import.
 
+**Website (GitHub Pages):** [https://mickyp.github.io/photos-to-fog-of-world/](https://mickyp.github.io/photos-to-fog-of-world/)
+
 Traditional Chinese README:
 - [README.zh-TW.md](README.zh-TW.md)
 

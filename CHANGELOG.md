@@ -4,6 +4,7 @@
 
 ### Added
 
+- `README.md` / `README.zh-TW.md`：於開頭加入 GitHub Pages 官網連結 [https://mickyp.github.io/photos-to-fog-of-world/](https://mickyp.github.io/photos-to-fog-of-world/)。
 - `index.html`：首頁新增「兩點之間貼道路線」示範區塊（中英說明），搭配 `images/map-auto-road.png`（Web GPX 編輯器 Road 模式 demo 截圖）。
 
 ### Changed

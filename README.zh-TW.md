@@ -4,6 +4,8 @@
 
 這個專案會遞迴掃描照片、讀取拍攝時間與座標、依照拍攝時間排序，最後輸出可匯入 Fog of World 的 `GPX`。除了核心 Python 腳本，專案也提供命令列包裝與桌面視窗版本。
 
+**官網（GitHub Pages）：** [https://mickyp.github.io/photos-to-fog-of-world/](https://mickyp.github.io/photos-to-fog-of-world/)
+
 英文說明請見：
 - [README.md](README.md)
 
