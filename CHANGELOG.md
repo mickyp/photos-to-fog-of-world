@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `index.html`：首頁新增「兩點之間貼道路線」示範區塊（中英說明），搭配 `images/map-auto-road.png`（Web GPX 編輯器 Road 模式 demo 截圖）。
+
 ### Changed
 
 - Removed unused `scripts/gpx_editor/*` stubs (CSS, app/core modules, tests); the web editor is implemented entirely in `scripts/gpx_editor.html`.
