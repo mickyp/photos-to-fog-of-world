@@ -51,8 +51,7 @@ Road 模式會用 OSRM 公開路線服務取得道路幾何，再把該區段改
 
 ## 檔案結構
 
-- `scripts/gpx_editor.html`：頁面入口
-- `scripts/gpx_editor/gpx_editor_core.mjs`：距離計算、時間格式化、匯出路徑計算
+- `scripts/gpx_editor.html`：單一 HTML 自包含頁面（樣式與腳本皆內嵌），無需其他同目錄檔案
 
 ## 限制
 

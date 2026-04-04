@@ -169,8 +169,7 @@ py scripts/fog_gpx_gui.py
 
 專案也包含瀏覽器版 GPX 編輯器：
 
-- `scripts/gpx_editor.html`：獨立的編輯器頁面
-- `scripts/gpx_editor/gpx_editor_core.mjs`：距離計算與匯出共用邏輯
+- `scripts/gpx_editor.html`：獨立的編輯器頁面（單一 HTML 自包含）
 
 操作說明請見 [GPX_EDITOR.md](GPX_EDITOR.md)。
 
@@ -197,7 +196,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
 - `scripts/fog_gpx_cli.py`：給終端使用者的 CLI 包裝
 - `scripts/fog_gpx_gui.py`：給終端使用者的 GUI 包裝
 - `scripts/gpx_editor.html`：瀏覽器版 GPX 編輯器
-- `scripts/gpx_editor/gpx_editor_core.mjs`：編輯器共用數學與匯出邏輯
 - `scripts/build_windows_exe.ps1`：Windows 封裝腳本
 
 ## 補充說明

@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Added `scripts/gpx_editor/gpx_editor_core.mjs` so the editor's shared math and export logic lives in one reusable module.
+- Removed unused `scripts/gpx_editor/*` stubs (CSS, app/core modules, tests); the web editor is implemented entirely in `scripts/gpx_editor.html`.
 - Added explanatory comments to the adaptive conversion flow in `scripts/build_fog_gpx.py`.
 - Rewrote the English and Traditional Chinese READMEs so they match the current CLI, GUI, and web editor structure.
 - Rewrote `GPX_EDITOR.md` to describe the current editor workflow and file layout more clearly.

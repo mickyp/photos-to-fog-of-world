@@ -169,8 +169,7 @@ The app shows progress while scanning and alerts you when the export is complete
 
 The repository also contains a browser-based GPX editor:
 
-- `scripts/gpx_editor.html`: standalone editor page
-- `scripts/gpx_editor/gpx_editor_core.mjs`: shared export and distance helpers
+- `scripts/gpx_editor.html`: standalone editor page (single self-contained HTML file)
 
 See [GPX_EDITOR.md](GPX_EDITOR.md) for usage notes.
 
@@ -199,7 +198,6 @@ The version number comes from the repository-root `VERSION` file. Update that fi
 - `scripts/fog_gpx_cli.py`: end-user CLI wrapper
 - `scripts/fog_gpx_gui.py`: end-user GUI wrapper
 - `scripts/gpx_editor.html`: browser-based GPX editor
-- `scripts/gpx_editor/gpx_editor_core.mjs`: editor math and export helpers
 - `scripts/build_windows_exe.ps1`: packaging helper for Windows builds
 
 ## Notes
