@@ -9,6 +9,7 @@
 
 ### Changed
 
+- `README.zh-TW.md`：標題與開頭改為「將照片匯入世界迷霧」並在首句標示「世界迷霧 (Fog of World)」。
 - `README.md` / `README.zh-TW.md`：雙語互連結文字改為「正體中文版」與「English Version」。
 - Removed unused `scripts/gpx_editor/*` stubs (CSS, app/core modules, tests); the web editor is implemented entirely in `scripts/gpx_editor.html`.
 - Added explanatory comments to the adaptive conversion flow in `scripts/build_fog_gpx.py`.
