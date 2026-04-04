@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photos to Fog of World</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090b;
+      --card-bg: rgba(24, 24, 27, 0.64);
+      --card-hover: rgba(39, 39, 42, 0.86);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --secondary: #818cf8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .bg-blobs {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .blob {
+      position: absolute;
+      filter: blur(80px);
+      opacity: 0.5;
+      animation: float 10s ease-in-out infinite alternate;
+    }
+
+    .blob-1 {
+      top: -10%;
+      left: -10%;
+      width: 50vw;
+      height: 50vw;
+      background: rgba(56, 189, 248, 0.3);
+      animation-delay: 0s;
+    }
+
+    .blob-2 {
+      bottom: -10%;
+      right: -10%;
+      width: 60vw;
+      height: 60vw;
+      background: rgba(129, 140, 248, 0.2);
+      animation-delay: -5s;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0) scale(1); }
+      100% { transform: translateY(-20px) scale(1.05); }
+    }
+
+    .lang-switch {
+      position: absolute;
+      top: 1.5rem;
+      right: 2rem;
+      z-index: 100;
+    }
+
+    .lang-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+
+    .lang-btn:hover {
+      background: var(--card-hover);
+      border-color: var(--primary);
+    }
+
+    .container {
+      max-width: 1000px;
+      padding: 4rem 2rem;
+      width: 100%;
+      z-index: 1;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 5rem;
+      animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    .title {
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #e0f2fe 0%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: clamp(1.1rem, 2vw, 1.4rem);
+      color: var(--text-muted);
+      max-width: 650px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    .card:hover {
+      transform: translateY(-8px) scale(1.02);
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.2);
+    }
+
+    .card:hover::before { opacity: 1; }
+
+    .card-icon {
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
+      display: inline-block;
+      transition: transform 0.4s ease;
+    }
+
+    .card:hover .card-icon {
+      transform: scale(1.1) rotate(-5deg);
+    }
+
+    .card-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: #fff;
+    }
+
+    .card-desc {
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 1rem;
+      margin-bottom: 2rem;
+      flex-grow: 1;
+    }
+
+    .card-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.9rem;
+    }
+
+    .card-cta svg {
+      width: 16px;
+      height: 16px;
+      transition: transform 0.3s;
+    }
+
+    .card:hover .card-cta svg {
+      transform: translateX(4px);
+    }
+
+    .primary-card {
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .footer {
+      margin-top: auto;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      animation: fadeUp 1s ease 0.4s forwards;
+      opacity: 0;
+    }
+
+    .footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <div class="lang-switch">
+    <button id="lang-btn" class="lang-btn" onclick="toggleLang()">中文</button>
+  </div>
+
+  <div class="container">
+    <header class="hero">
+      <h1 class="title" data-i18n="heroTitle">Photos to Fog of World</h1>
+      <p class="subtitle" data-i18n="heroSubtitle">Transform photos with GPS data into GPX tracks for Fog of World and keep the travel timeline from your camera intact.</p>
+    </header>
+
+    <main class="cards-grid">
+      <a href="scripts/gpx_editor.html" class="card primary-card">
+        <span class="card-icon">Map</span>
+        <h2 class="card-title" data-i18n="card1Title">Web GPX Editor</h2>
+        <p class="card-desc" data-i18n="card1Desc">Open a GPX file in the browser, trim or add waypoints, snap selected ranges to roads, and export a cleaner track for Fog of World.</p>
+        <div class="card-cta">
+          <span data-i18n="card1Cta">Launch editor</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </div>
+      </a>
+
+      <a href="https://github.com/mickyp/photos-to-fog-of-world" target="_blank" rel="noreferrer" class="card">
+        <span class="card-icon">CLI</span>
+        <h2 class="card-title" data-i18n="card2Title">Photo Converter Tool</h2>
+        <p class="card-desc" data-i18n="card2Desc">Use the Python script, CLI wrapper, or Windows GUI to scan entire folders of geotagged photos and export GPX files in bulk.</p>
+        <div class="card-cta">
+          <span data-i18n="card2Cta">Open repository</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </div>
+      </a>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <p><span data-i18n="footerText">&copy; 2026 Photos to Fog of World. Hosted on </span><a href="https://pages.github.com" target="_blank" rel="noreferrer">GitHub Pages</a>.</p>
+  </footer>
+
+  <script>
+    const i18n = {
+      en: {
+        heroTitle: 'Photos to Fog of World',
+        heroSubtitle: 'Transform photos with GPS data into GPX tracks for Fog of World and keep the travel timeline from your camera intact.',
+        card1Title: 'Web GPX Editor',
+        card1Desc: 'Open a GPX file in the browser, trim or add waypoints, snap selected ranges to roads, and export a cleaner track for Fog of World.',
+        card1Cta: 'Launch editor',
+        card2Title: 'Photo Converter Tool',
+        card2Desc: 'Use the Python script, CLI wrapper, or Windows GUI to scan entire folders of geotagged photos and export GPX files in bulk.',
+        card2Cta: 'Open repository',
+        footerText: '&copy; 2026 Photos to Fog of World. Hosted on ',
+        langBtnText: '中文',
+      },
+      zh: {
+        heroTitle: 'Photos to Fog of World',
+        heroSubtitle: '把帶有 GPS 資訊的照片整理成 Fog of World 可匯入的 GPX 軌跡，同時保留拍攝時間順序。',
+        card1Title: 'Web GPX 編輯器',
+        card1Desc: '直接在瀏覽器開啟 GPX、刪減或補點、把指定區段貼齊道路，最後匯出更適合 Fog of World 的軌跡。',
+        card1Cta: '開啟編輯器',
+        card2Title: '照片轉 GPX 工具',
+        card2Desc: '使用 Python 腳本、命令列包裝或 Windows GUI，一次掃描整批有 GPS 的照片並輸出 GPX。',
+        card2Cta: '前往儲存庫',
+        footerText: '&copy; 2026 Photos to Fog of World. 託管於 ',
+        langBtnText: 'EN',
+      }
+    };
+
+    let currentLang = 'en';
+
+    function setLang(lang) {
+      currentLang = lang;
+      const dict = i18n[lang];
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.innerHTML = dict[key];
+        }
+      });
+      document.getElementById('lang-btn').innerText = dict.langBtnText;
+      document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en';
+    }
+
+    function toggleLang() {
+      setLang(currentLang === 'en' ? 'zh' : 'en');
+    }
+
+    setLang('en');
+  </script>
+</body>
+</html>

@@ -272,6 +272,9 @@ def normalize_exiftool_warning_text(warning_text: str | None) -> str | None:
         stripped = line.strip()
         if not stripped:
             continue
+        # ExifTool emits charset hints on Windows even when the actual metadata
+        # scan succeeds. Filtering those keeps the user-facing summary focused on
+        # warnings that may require action.
         if stripped.startswith("Invalid Charset cp950"):
             continue
         if stripped.startswith("FileName encoding not specified."):
@@ -689,6 +692,8 @@ def convert_directory_adaptive(
     total_child_supported_files = sum(count for _, count in child_counts)
     child_dirs_with_supported_files = [child for child, count in child_counts if count > 0]
 
+    # Large month/trip folders are split one level deeper first so we can keep
+    # memory usage predictable while still writing a merged GPX for the parent.
     if child_dirs_with_supported_files and total_child_supported_files > split_threshold:
         merged_points: list[TrackPoint] = []
         child_skipped_total = 0
@@ -797,6 +802,9 @@ def run_conversion(options: RunOptions, line_printer: Callable[[str], None] | No
         total_skipped_files = 0
         yearly_output_path = options.output or default_output_path(input_dir)
 
+        # A folder named like "2019" is treated as a year bucket: export each
+        # first-level child on its own, then merge everything back into a
+        # top-level yearly GPX for Fog of World import.
         for child_dir in child_dirs:
             existing_child_gpx = (
                 find_latest_child_gpx(child_dir)

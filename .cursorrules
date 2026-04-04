@@ -1,0 +1,8 @@
+# General Environment Rules
+
+- The user operates on Windows 11.
+- All terminal commands and scripts must be run using PowerShell syntax by default.
+- Do NOT use Linux-specific terminal commands (like `rm -rf`, `ls`, `grep`, `cat` directly via shell) unless executing them through a tool that specifically encapsulates them. Instead, use their PowerShell equivalents (like `Remove-Item`, `Get-ChildItem`, `Select-String`, `Get-Content`) when instructed to write terminal commands.
+- 每當程式碼或內容有實質異動時，在任務結束前必須完成 **`git commit`，且 commit message 一律使用繁體中文**（簡述變更與目的）。
+- 每次修改後必須**主動更新對應文件**；無合適現成文件時，視情況在 `docs/` 新增繁中簡短說明，並在 README 或 CHANGELOG 中露出。
+- **完整對照與流程**：`.cursor/rules/commit-and-docs-zh.mdc`。

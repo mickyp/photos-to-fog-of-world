@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPX 軌跡編輯器 — Photos to Fog of World</title>
+  <meta name="description" content="載入 GPX 檔案，在地圖上編輯軌跡點，補充道路路線，每 3 公尺產生一個軌跡點，匯出為新的 GPX 檔案。" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0b1a;
+      --surface: rgba(255,255,255,0.12);
+      --surface-hover: rgba(255,255,255,0.18);
+      --border: rgba(255,255,255,0.15);
+      --text: #f1f5f9;
+      --text-muted: #cbd5e1;
+      --accent: #00d4ff;
+      --accent-dim: rgba(0,212,255,0.15);
+      --purple: #a855f7;
+      --purple-dim: rgba(168,85,247,0.15);
+      --orange: #f97316;
+      --orange-dim: rgba(249,115,22,0.15);
+      --red: #ef4444;
+      --green: #22c55e;
+      --danger: rgba(239,68,68,0.15);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --header-h: 56px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      height: var(--header-h);
+      background: rgba(10,11,26,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+    .logo-icon { font-size: 20px; }
+    .logo-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+    .header-spacer { flex: 1; }
+    .legend { display: flex; align-items: center; gap: 16px; margin-right: 8px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500; font-family: inherit;
+      border: none; cursor: pointer; transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface-hover); }
+    .btn-danger { background: var(--danger); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+    .btn-icon { padding: 7px 10px; }
+    label.btn { cursor: pointer; }
+
+    /* ── Glass Panel ── */
+    .glass {
+      background: rgba(10,11,26,0.75);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    /* ── Map ── */
+    #map {
+      position: fixed;
+      top: var(--header-h); left: 0; right: 0; bottom: 0;
+      z-index: 1;
+    }
+    #map.mode-add { cursor: crosshair !important; }
+    #map.mode-delete { cursor: not-allowed !important; }
+    #map.mode-snap { cursor: cell !important; }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      position: fixed;
+      top: calc(var(--header-h) + 12px);
+      left: 12px;
+      z-index: 500;
+      padding: 8px;
+      display: flex; flex-direction: column; gap: 4px; min-width: 60px;
+      background: rgba(15, 16, 35, 0.85); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .tool-btn {
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-sm);
+      background: transparent; border: 1px solid transparent;
+      color: var(--text-muted); font-size: 20px;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .tool-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
+    .tool-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+    .tool-btn.active-snap { background: var(--purple-dim); color: var(--purple); border-color: var(--purple); }
+    .tool-sep { height: 1px; background: var(--border); margin: 4px 0; }
+    .tool-label { font-size: 11px; color: var(--text-muted); text-align: center; margin-top: -2px; letter-spacing: 0.3px; }
+
+    /* ── Stats Panel ── */
+    #stats {
+      position: fixed;
+      top: calc(var(--header-h) + 12px);
+      right: 12px;
+      z-index: 500;
+      padding: 14px 16px;
+      min-width: 180px;
+      background: rgba(15, 16, 35, 0.85); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .stats-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; }
+    .stat-label { color: var(--text-muted); }
+    .stat-val { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .stat-val.accent { color: var(--accent); }
+
+    /* ── Status Bar ── */
+    #statusbar {
+      position: fixed;
+      bottom: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 500;
+      padding: 8px 16px;
+      font-size: 13px; color: var(--text);
+      display: none; align-items: center; gap: 8px;
+      white-space: nowrap;
+    }
+    #statusbar.visible { display: flex; }
+    #statusbar.info { border-color: rgba(0,212,255,0.3); }
+    #statusbar.warn { color: var(--orange); border-color: rgba(249,115,22,0.3); }
+    #statusbar.success { color: var(--green); border-color: rgba(34,197,94,0.3); }
+    #statusbar.error { color: var(--red); border-color: rgba(239,68,68,0.3); }
+    .spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: var(--accent);
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Export Panel ── */
+    #export-panel {
+      position: fixed;
+      bottom: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 500;
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    #track-name {
+      background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 7px 12px;
+      color: var(--text); font-family: inherit; font-size: 13px;
+      width: 200px; outline: none; transition: border-color 0.15s;
+    }
+    #track-name:focus { border-color: var(--accent); }
+    #track-name::placeholder { color: var(--text-muted); }
+
+    /* ── Snap prompt ── */
+    #snap-prompt {
+      position: fixed;
+      top: calc(var(--header-h) + 12px);
+      left: 50%; transform: translateX(-50%);
+      z-index: 600;
+      padding: 10px 18px;
+      display: none; align-items: center; gap: 10px;
+      font-size: 13px; color: var(--purple);
+      border-color: rgba(168,85,247,0.4);
+    }
+    #snap-prompt.visible { display: flex; }
+    .snap-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)} }
+
+    /* ── Drop overlay ── */
+    #dropzone {
+      position: fixed; inset: 0; z-index: 2000;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    }
+    #dropzone.active { display: flex; }
+    .dropzone-box {
+      border: 2px dashed var(--accent); border-radius: 20px;
+      padding: 60px 80px; text-align: center;
+      animation: dropPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes dropPulse { 0%,100%{border-color:var(--accent)}50%{border-color:rgba(0,212,255,0.4)} }
+    .dropzone-icon { font-size: 48px; margin-bottom: 12px; }
+    .dropzone-txt { font-size: 18px; font-weight: 600; color: var(--accent); }
+    .dropzone-sub { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+
+    /* ── Snap mode buttons ── */
+    .snap-modes { display: flex; gap: 4px; align-items: center; }
+    .snap-mode-btn {
+      width: 28px; height: 28px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; font-size: 14px;
+      background: transparent; border: 1px solid var(--border);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .snap-mode-btn:hover { background: var(--surface-hover); }
+    .snap-mode-btn.active { background: var(--purple-dim); border-color: var(--purple); box-shadow: 0 0 0 2px rgba(168,85,247,0.2); }
+
+    /* ── Waypoint markers (via Leaflet DivIcon) ── */
+    .wp-marker {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--orange); border: 2.5px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700; color: #fff; line-height: 1;
+      font-family: 'Inter', system-ui, sans-serif;
+      cursor: pointer; transition: all 0.12s ease; user-select: none;
+    }
+    .wp-marker:hover { transform: scale(1.3); }
+    .wp-marker.selected {
+      background: var(--purple); border-color: #fff;
+      box-shadow: 0 0 0 4px rgba(168,85,247,0.4), 0 2px 8px rgba(0,0,0,0.5);
+      animation: wpPulse 1s ease infinite;
+    }
+    @keyframes wpPulse { 0%,100%{box-shadow:0 0 0 4px rgba(168,85,247,0.4),0 2px 8px rgba(0,0,0,0.5)}50%{box-shadow:0 0 0 7px rgba(168,85,247,0.2),0 2px 8px rgba(0,0,0,0.5)} }
+    .wp-marker.delete-mode:hover { background: var(--red); transform: scale(1.3); }
+
+    /* ── Search UI ── */
+    .search-container { position: relative; margin-right: 16px; font-family: 'Inter', system-ui, sans-serif; }
+    .search-box {
+      display: flex; align-items: center; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px;
+      transition: border-color 0.2s;
+    }
+    .search-box:focus-within { border-color: var(--accent); }
+    .search-box input {
+      background: transparent; border: none; color: var(--text); font-size: 13px;
+      width: 140px; outline: none; transition: width 0.2s;
+    }
+    .search-box input:focus { width: 180px; }
+    .search-box button {
+      background: transparent; border: none; color: var(--text-muted); padding: 0 4px;
+      cursor: pointer; display: none; font-size: 14px;
+    }
+    .search-box button:hover { color: var(--text); }
+    #loc-search-results {
+      position: absolute; top: calc(100% + 4px); right: 0; width: 260px;
+      background: rgba(15, 16, 35, 0.95); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      margin: 0; padding: 4px 0; list-style: none; max-height: 250px; overflow-y: auto;
+      z-index: 2000; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none;
+    }
+    #loc-search-results li {
+      padding: 8px 12px; font-size: 12px; cursor: pointer; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    #loc-search-results li:last-child { border-bottom: none; }
+    #loc-search-results li:hover { background: var(--surface-hover); }
+    .res-name { font-weight: 600; color: var(--text); }
+    .res-addr { color: var(--text-muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .search-loading { padding: 8px 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+    /* ── Leaflet overrides ── */
+    .leaflet-control-attribution { font-size: 10px !important; }
+    .leaflet-control-zoom a {
+      background: rgba(10,11,26,0.85) !important; backdrop-filter: blur(8px);
+      color: var(--text) !important; border-color: var(--border) !important;
+    }
+    .leaflet-control-zoom a:hover { background: var(--surface-hover) !important; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+<header id="header">
+  <div class="logo">
+    <span class="logo-icon">🗺️</span>
+    <div>
+      <div data-i18n="appTitle">GPX 軌跡編輯器</div>
+      <div class="logo-sub">Photos to Fog of World</div>
+    </div>
+  </div>
+  <div class="header-spacer"></div>
+
+  <div id="search-container" class="search-container">
+    <div class="search-box">
+      <span style="font-size:14px; margin-right:4px;">🔍</span>
+      <input type="text" id="loc-search-input" data-i18n-placeholder="searchLoc" placeholder="搜尋地點..." autocomplete="off">
+      <button id="loc-search-clear">✕</button>
+    </div>
+    <ul id="loc-search-results"></ul>
+  </div>
+
+  <div id="file-info" style="font-size: 12px; color: var(--text-muted); background: var(--surface); padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none;" title=""></div>
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#ef4444;opacity:0.7"></div>
+      <span data-i18n="legendOriginal">原始 GPX</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#3b82f6"></div>
+      <span title="汽車/機車 Car">🚗</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#22c55e"></div>
+      <span title="腳踏車 Bike">🚲</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#00d4ff"></div>
+      <span title="步行 Walk">🚶</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#94a3b8;border:1px dashed #fff"></div>
+      <span data-i18n="legendStraight">直線</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f97316"></div>
+      <span data-i18n="legendWaypoint">節點</span>
+    </div>
+  </div>
+  <button id="btn-lang" class="btn btn-ghost btn-icon">EN</button>
+  <label class="btn btn-ghost" id="btn-load">
+    <span>📂</span><span data-i18n="loadGPX">載入 GPX</span>
+    <input type="file" id="file-input" accept=".gpx" hidden />
+  </label>
+  <button id="btn-clear" class="btn btn-danger" data-i18n="clearAll">清除全部</button>
+</header>
+
+<!-- ═══════════════════════════════ TOOLBAR ═══════════════════════════════ -->
+<div id="toolbar" class="glass">
+  <button class="tool-btn active" id="tool-pan" data-mode="pan" title="">🖐️</button>
+  <div class="tool-label" data-i18n="modePan">平移</div>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" id="tool-add" data-mode="add" title="">➕</button>
+  <div class="tool-label" data-i18n="modeAdd">新增</div>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" id="tool-delete" data-mode="delete" title="">✕</button>
+  <div class="tool-label" data-i18n="modeDelete">刪除</div>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" id="tool-snap" data-mode="snap" title="">🛣️</button>
+  <div class="tool-label" data-i18n="modeSnap">道路</div>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" id="tool-undo" title="">↩️</button>
+  <div class="tool-label" data-i18n="undo">復原</div>
+</div>
+
+<!-- ═══════════════════════════════ MAP ═══════════════════════════════════ -->
+<div id="map"></div>
+
+<!-- ═══════════════════════════════ STATS ═══════════════════════════════ -->
+<div id="stats" class="glass">
+  <div class="stats-title" data-i18n="statsTitle">統計資訊</div>
+  <div class="stat-row">
+    <span class="stat-label" data-i18n="statWaypoints">節點數</span>
+    <span class="stat-val accent" id="stat-wp">0</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label" data-i18n="statDistance">總距離</span>
+    <span class="stat-val" id="stat-dist">—</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label" data-i18n="statPoints">預估點數 (3m)</span>
+    <span class="stat-val" id="stat-pts">—</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label" data-i18n="statRoad">道路段數</span>
+    <span class="stat-val" id="stat-segs">0</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SNAP PROMPT ══════════════════════════ -->
+<div id="snap-prompt" class="glass">
+  <div class="snap-dot"></div>
+  <span id="snap-msg" data-i18n="snapStep1">點選第一個節點</span>
+  <div class="snap-modes">
+    <button class="snap-mode-btn" data-profile="driving" title="汽車/機車 (Car/Motorcycle)">🚗</button>
+    <button class="snap-mode-btn" data-profile="cycling" title="腳踏車 (Bicycle)">🚲</button>
+    <button class="snap-mode-btn active" data-profile="foot" title="步行 (Walking)">🚶</button>
+    <button class="snap-mode-btn" data-profile="straight" title="直線，適合鐵路/渡輪 (Straight Line)">✏️</button>
+  </div>
+  <button id="btn-snap-cancel" class="btn btn-ghost" style="padding:4px 10px;font-size:12px" data-i18n="cancel">取消</button>
+</div>
+
+<!-- ═══════════════════════════════ STATUS BAR ═══════════════════════════ -->
+<div id="statusbar" class="glass"></div>
+
+<!-- ═══════════════════════════════ EXPORT ═══════════════════════════════ -->
+<div id="export-panel" class="glass">
+  <button id="btn-export" class="btn btn-primary">
+    <span>💾</span><span data-i18n="exportGPX">匯出 GPX</span>
+  </button>
+</div>
+
+<!-- ═══════════════════════════════ DROP ZONE ════════════════════════════ -->
+<div id="dropzone">
+  <div class="dropzone-box">
+    <div class="dropzone-icon">📍</div>
+    <div class="dropzone-txt" data-i18n="dropTitle">拖曳 GPX 檔案至此</div>
+    <div class="dropzone-sub" data-i18n="dropSub">放開以載入軌跡</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════════════════
+//  i18n
+// ════════════════════════════════════════════════════════════════════════
+const STRINGS = {
+  zh: {
+    appTitle: 'GPX 軌跡編輯器',
+    loadGPX: '載入 GPX',
+    clearAll: '清除全部',
+    legendOriginal: '原始 GPX',
+    legendRoad: '道路路線',
+    legendStraight: '直線',
+    legendWaypoint: '節點',
+    modePan: '平移',
+    modeAdd: '新增',
+    modeDelete: '刪除',
+    modeSnap: '道路',
+    undo: '復原',
+    statsTitle: '統計資訊',
+    statWaypoints: '節點數',
+    statDistance: '總距離',
+    statPoints: '預估點數 (5m)',
+    statRoad: '道路段數',
+    searchLoc: '搜尋地點...',
+    searchLoading: '搜尋中...',
+    searchNoResults: '找不到結果',
+    snapStep1: '點選第一個節點',
+    snapStep2: '點選第二個節點（可跨節點，中間的會自動移除）',
+    statusSameWp: '請選擇不同的節點',
+    cancel: '取消',
+    trackNamePlaceholder: '輸入軌跡名稱',
+    exportGPX: '匯出 GPX',
+    dropTitle: '拖曳 GPX 檔案至此',
+    dropSub: '放開以載入軌跡',
+    statusReady: '就緒',
+    statusLoading: '載入中…',
+    statusFetching: '取得道路路線…',
+    statusExporting: '產生 GPX…',
+    statusExported: 'GPX 已匯出！',
+    statusNoWaypoints: '請先新增節點',
+    statusNoRoute: '找不到道路路線，改用直線',
+    statusNotAdjacent: '請選擇相鄰節點',
+    statusSnapDone: '道路路線已套用',
+    statusCleared: '已清除全部節點',
+    statusLoaded: pt => `已載入 ${pt} 個節點`,
+    statusUndone: '已復原',
+    clearConfirm: '確定要清除所有節點嗎？',
+  },
+  en: {
+    appTitle: 'GPX Track Editor',
+    loadGPX: 'Load GPX',
+    clearAll: 'Clear All',
+    legendOriginal: 'Original GPX',
+    legendRoad: 'Road Route',
+    legendStraight: 'Straight Line',
+    legendWaypoint: 'Waypoint',
+    modePan: 'Pan',
+    modeAdd: 'Add',
+    modeDelete: 'Delete',
+    modeSnap: 'Road',
+    undo: 'Undo',
+    statsTitle: 'Statistics',
+    statWaypoints: 'Waypoints',
+    statDistance: 'Total Distance',
+    statPoints: 'Est. Points (5m)',
+    statRoad: 'Road Segments',
+    searchLoc: 'Search location...',
+    searchLoading: 'Searching...',
+    searchNoResults: 'No results found',
+    snapStep1: 'Click the first waypoint',
+    snapStep2: 'Click the second waypoint (intermediates will be removed)',
+    statusSameWp: 'Please select a different waypoint',
+    cancel: 'Cancel',
+    trackNamePlaceholder: 'Enter track name',
+    exportGPX: 'Export GPX',
+    dropTitle: 'Drop GPX File Here',
+    dropSub: 'Release to load track',
+    statusReady: 'Ready',
+    statusLoading: 'Loading…',
+    statusFetching: 'Fetching road route…',
+    statusExporting: 'Generating GPX…',
+    statusExported: 'GPX exported!',
+    statusNoWaypoints: 'Please add waypoints first',
+    statusNoRoute: 'No route found, using straight line',
+    statusNotAdjacent: 'Please select adjacent waypoints',
+    statusSnapDone: 'Road route applied',
+    statusCleared: 'All waypoints cleared',
+    statusLoaded: pt => `Loaded ${pt} waypoints`,
+    statusUndone: 'Undone',
+    clearConfirm: 'Clear all waypoints?',
+  }
+};
+
+let lang = 'zh';
+function t(key, ...args) {
+  const v = STRINGS[lang][key];
+  return typeof v === 'function' ? v(...args) : (v ?? key);
+}
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.dataset.i18n;
+    if (t(k) !== k) el.textContent = t(k);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const k = el.dataset.i18nPlaceholder;
+    if (t(k) !== k) el.placeholder = t(k);
+  });
+  document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en';
+  document.getElementById('btn-lang').textContent = lang === 'zh' ? 'EN' : '中';
+  document.title = t('appTitle') + ' — Photos to Fog of World';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════════════════════
+const state = {
+  waypoints: [],  // { lat, lon, time:Date|null, ele:number|null, marker:L.Marker }
+  segments:  [],  // { type:'straight'|'road', pts:[{lat,lon}] } length = wp.length - 1
+  pathLayers: [], // active Leaflet layers for path
+  originalLayer: null,
+  mode: 'pan',
+  snapFirst: -1,     // index of first selected wp in snap mode
+  snapProfile: 'foot', // 'driving' | 'cycling' | 'foot' | 'straight'
+  history: [],     // undo stack: [{waypoints snapshot, segments snapshot}]
+  originalFilename: '',
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  Map init
+// ════════════════════════════════════════════════════════════════════════
+let map;
+function initMap() {
+  map = L.map('map', { zoomControl: false });
+  // CartoDB tiles work without Referer header (fine for local file:// usage)
+  const cartoLight = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd', maxZoom: 20,
+    }
+  );
+  const cartoDark = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd', maxZoom: 20,
+    }
+  );
+  cartoLight.addTo(map);
+  L.control.layers({ '🗺️ Light': cartoLight, '🌑 Dark': cartoDark }, {}, { position: 'bottomright' }).addTo(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  map.setView([25.047, 121.517], 13);
+  map.on('click', onMapClick);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Waypoint icons
+// ════════════════════════════════════════════════════════════════════════
+function makeIcon(selected = false, num = '') {
+  const cls = selected ? 'wp-marker selected' : 'wp-marker';
+  const label = num === '' ? '' : (num > 999 ? '···' : num);
+  return L.divIcon({
+    className: '',
+    html: `<div class="${cls}">${label}</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Waypoint management
+// ════════════════════════════════════════════════════════════════════════
+function addWaypoint(lat, lon, time = null, ele = null, insertAfter = -1) {
+  saveHistory();
+  const marker = L.marker([lat, lon], { draggable: true, icon: makeIcon() }).addTo(map);
+  const wp = { lat, lon, time, ele, marker };
+
+  marker.on('click', e => { L.DomEvent.stopPropagation(e); onWpClick(wp); });
+  marker.on('dragstart', () => saveHistory());
+  marker.on('drag', e => {
+    const ll = e.target.getLatLng();
+    wp.lat = ll.lat; wp.lon = ll.lng;
+    const idx = state.waypoints.indexOf(wp);
+    // Clear adjacent road segments on drag
+    if (idx > 0 && state.segments[idx-1]?.type === 'road') state.segments[idx-1] = {type:'straight', pts:[]};
+    if (idx < state.waypoints.length-1 && state.segments[idx]?.type === 'road') state.segments[idx] = {type:'straight', pts:[]};
+    redrawPath();
+  });
+
+  if (insertAfter >= 0 && insertAfter < state.waypoints.length - 1) {
+    state.waypoints.splice(insertAfter + 1, 0, wp);
+    state.segments.splice(insertAfter, 1, { type:'straight', pts:[] }, { type:'straight', pts:[] });
+  } else {
+    if (state.waypoints.length > 0) state.segments.push({ type:'straight', pts:[] });
+    state.waypoints.push(wp);
+  }
+  redrawPath();
+  updateStats();
+  refreshMarkerIcons();
+}
+
+function removeWaypoint(wp) {
+  saveHistory();
+  const idx = state.waypoints.indexOf(wp);
+  if (idx < 0) return;
+  map.removeLayer(wp.marker);
+  state.waypoints.splice(idx, 1);
+  // Merge or remove adjacent segments
+  if (state.segments.length >= 1) {
+    if (idx === 0) {
+      state.segments.splice(0, 1);
+    } else if (idx === state.waypoints.length) {
+      state.segments.splice(idx - 1, 1);
+    } else {
+      state.segments.splice(idx - 1, 2, { type:'straight', pts:[] });
+    }
+  }
+  redrawPath();
+  updateStats();
+  refreshMarkerIcons();
+}
+
+function clearAll(confirm_ = true) {
+  if (confirm_ && state.waypoints.length > 0 && !window.confirm(t('clearConfirm'))) return;
+  saveHistory();
+  state.waypoints.forEach(wp => map.removeLayer(wp.marker));
+  state.waypoints = [];
+  state.segments = [];
+  clearPathLayers();
+  if (state.originalLayer) {
+    map.removeLayer(state.originalLayer);
+    state.originalLayer = null;
+  }
+  document.getElementById('file-info').style.display = 'none';
+  updateStats();
+  showStatus(t('statusCleared'), 'info', 2000);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Path rendering
+// ════════════════════════════════════════════════════════════════════════
+function clearPathLayers() {
+  state.pathLayers.forEach(l => map.removeLayer(l));
+  state.pathLayers = [];
+}
+
+function redrawPath() {
+  clearPathLayers();
+  for (let i = 0; i < state.waypoints.length - 1; i++) {
+    const seg = state.segments[i] || { type:'straight', pts:[] };
+    const wA = state.waypoints[i];
+    const wB = state.waypoints[i + 1];
+    if (seg.type === 'road' && seg.pts && seg.pts.length > 1) {
+      const profileColors = { driving: '#3b82f6', cycling: '#22c55e', foot: '#00d4ff' };
+      const roadColor = profileColors[seg.profile] || '#00d4ff';
+      const line = L.polyline(seg.pts.map(p => [p.lat, p.lon]), {
+        color: roadColor, weight: 3, opacity: 0.85,
+      }).addTo(map);
+      state.pathLayers.push(line);
+    } else {
+      const line = L.polyline([[wA.lat, wA.lon], [wB.lat, wB.lon]], {
+        color: '#94a3b8', weight: 2, opacity: 0.7, dashArray: '6 5',
+      }).addTo(map);
+      state.pathLayers.push(line);
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Stats
+// ════════════════════════════════════════════════════════════════════════
+function updateStats() {
+  const wpCount = state.waypoints.length;
+  document.getElementById('stat-wp').textContent = wpCount;
+
+  if (wpCount < 2) {
+    document.getElementById('stat-dist').textContent = '—';
+    document.getElementById('stat-pts').textContent = '—';
+    document.getElementById('stat-segs').textContent = '0';
+    return;
+  }
+
+  // Total distance
+  let totalM = 0;
+  let estimatedPts = state.waypoints.length;
+  for (let i = 0; i < state.waypoints.length - 1; i++) {
+    const seg = state.segments[i];
+    if (seg?.type === 'road' && seg.pts?.length > 1) {
+      let segDist = 0;
+      for (let j = 0; j < seg.pts.length - 1; j++) {
+        segDist += haversine(seg.pts[j].lat, seg.pts[j].lon, seg.pts[j+1].lat, seg.pts[j+1].lon);
+      }
+      totalM += segDist;
+      estimatedPts += Math.floor(segDist / 5);
+    } else {
+      const a = state.waypoints[i], b = state.waypoints[i+1];
+      totalM += haversine(a.lat, a.lon, b.lat, b.lon);
+    }
+  }
+
+  document.getElementById('stat-dist').textContent =
+    totalM >= 1000 ? (totalM/1000).toFixed(2) + ' km' : Math.round(totalM) + ' m';
+  document.getElementById('stat-pts').textContent = '~' + estimatedPts.toLocaleString();
+  document.getElementById('stat-segs').textContent =
+    state.segments.filter(s => s?.type === 'road').length;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Status bar
+// ════════════════════════════════════════════════════════════════════════
+let _statusTimer = null;
+function showStatus(msg, type = 'info', duration = 0, spinner = false) {
+  const el = document.getElementById('statusbar');
+  el.innerHTML = spinner
+    ? `<div class="spinner"></div>${msg}`
+    : msg;
+  el.className = `glass visible ${type}`;
+  clearTimeout(_statusTimer);
+  if (duration > 0) _statusTimer = setTimeout(() => hideStatus(), duration);
+}
+function hideStatus() {
+  document.getElementById('statusbar').className = 'glass';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Mode management
+// ════════════════════════════════════════════════════════════════════════
+function setMode(m) {
+  state.mode = m;
+  // Reset snap
+  if (m !== 'snap') {
+    state.snapFirst = -1;
+    document.getElementById('snap-prompt').classList.remove('visible');
+    refreshMarkerIcons();
+  } else {
+    state.snapFirst = -1;
+    document.getElementById('snap-prompt').classList.add('visible');
+    document.getElementById('snap-msg').textContent = t('snapStep1');
+  }
+
+  document.querySelectorAll('.tool-btn[data-mode]').forEach(btn => {
+    btn.classList.remove('active', 'active-snap');
+    if (btn.dataset.mode === m) btn.classList.add(m === 'snap' ? 'active-snap' : 'active');
+  });
+
+  const mapEl = document.getElementById('map');
+  mapEl.className = '';  // reset
+  if (m === 'add') mapEl.classList.add('mode-add');
+  else if (m === 'delete') mapEl.classList.add('mode-delete');
+  else if (m === 'snap') mapEl.classList.add('mode-snap');
+
+  // Update marker appearance
+  state.waypoints.forEach((wp, i) => {
+    wp.marker.setIcon(makeIcon(false, i + 1));
+    wp.marker.draggingEnabled = m !== 'add';  // still draggable in all non-delete modes
+  });
+}
+
+// Update all marker icons with their current index numbers and snap-selection state
+function refreshMarkerIcons() {
+  state.waypoints.forEach((wp, i) => {
+    wp.marker.setIcon(makeIcon(i === state.snapFirst, i + 1));
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Click handlers
+// ════════════════════════════════════════════════════════════════════════
+// Find which segment index is closest to a lat/lon point (for smart insertion)
+function findNearestSegment(lat, lon) {
+  const n = state.waypoints.length;
+  if (n < 2) return -1; // will append
+  let minDist = Infinity, bestIdx = n - 1;
+  for (let i = 0; i < n - 1; i++) {
+    const a = state.waypoints[i], b = state.waypoints[i + 1];
+    const dx = b.lat - a.lat, dy = b.lon - a.lon;
+    const lenSq = dx*dx + dy*dy;
+    let t = lenSq > 0 ? Math.max(0, Math.min(1, ((lat - a.lat)*dx + (lon - a.lon)*dy) / lenSq)) : 0;
+    const nearLat = a.lat + t*dx, nearLon = a.lon + t*dy;
+    const d = haversine(lat, lon, nearLat, nearLon);
+    if (d < minDist) { minDist = d; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
+function onMapClick(e) {
+  if (state.mode === 'add') {
+    const insertAfter = findNearestSegment(e.latlng.lat, e.latlng.lng);
+    addWaypoint(e.latlng.lat, e.latlng.lng, null, null, insertAfter);
+  }
+}
+
+function onWpClick(wp) {
+  const idx = state.waypoints.indexOf(wp);
+  if (state.mode === 'delete') {
+    removeWaypoint(wp);
+  } else if (state.mode === 'pan') {
+    if (wp.marker._customPopup && wp.marker._customPopup.isOpen()) {
+      map.closePopup(wp.marker._customPopup);
+      wp.marker._customPopup = null;
+      return;
+    }
+
+    const tsStr = wp.time ? new Date(wp.time).toLocaleString() : (lang === 'zh' ? '無時間資訊' : 'No time info');
+    const eleStr = wp.ele !== null ? wp.ele.toFixed(1) + ' m' : (lang === 'zh' ? '無高度' : 'N/A');
+    const content = `
+      <div style="font-size:13px; line-height:1.5; color:#333; min-width:140px;">
+        <div style="font-weight:600; margin-bottom:4px; border-bottom:1px solid #ddd; padding-bottom:4px;">
+          ${lang === 'zh' ? '節點資訊' : 'Waypoint Info'} <span style="color:#666;font-size:11px;">#${idx + 1}</span>
+        </div>
+        <div><b>🕒</b> ${tsStr}</div>
+        <div><b>⛰️</b> ${eleStr}</div>
+        <div style="color:#888; font-size:11px; margin-top:4px;">📍 ${wp.lat.toFixed(5)}, ${wp.lon.toFixed(5)}</div>
+      </div>
+    `;
+    wp.marker._customPopup = L.popup({ closeButton: false, offset: [0, -6] })
+      .setLatLng([wp.lat, wp.lon])
+      .setContent(content)
+      .openOn(map);
+  } else if (state.mode === 'snap') {
+    if (state.snapFirst < 0) {
+      // Select first
+      state.snapFirst = idx;
+      refreshMarkerIcons();
+      document.getElementById('snap-msg').textContent = t('snapStep2');
+    } else {
+      // Select second
+      const lo = Math.min(state.snapFirst, idx);
+      const hi = Math.max(state.snapFirst, idx);
+      state.snapFirst = -1;
+      document.getElementById('snap-msg').textContent = t('snapStep1');
+      refreshMarkerIcons();
+
+      if (lo === hi) {
+        showStatus(t('statusSameWp'), 'warn', 2000);
+        return;
+      }
+
+      // Snap each segment between lo and hi without deleting intermediate waypoints
+      doRoadSnapRange(lo, hi);
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  OSRM road snap
+// ════════════════════════════════════════════════════════════════════════
+async function doRoadSnapRange(lo, hi) {
+  const profile = state.snapProfile;
+
+  if (profile === 'straight') {
+    for (let i = lo; i < hi; i++) {
+      state.segments[i] = { type: 'straight', profile: 'straight', pts: [] };
+    }
+    redrawPath();
+    updateStats();
+    showStatus(t('statusSnapDone'), 'success', 2000);
+    return;
+  }
+
+  const profileLabels = { driving: '🚗', cycling: '🚲', foot: '🚶' };
+  showStatus(`${profileLabels[profile] || ''} ${t('statusFetching')} (${hi - lo})`, 'info', 0, true);
+  
+  try {
+    const promises = [];
+    for (let i = lo; i < hi; i++) {
+       const wA = state.waypoints[i];
+       const wB = state.waypoints[i + 1];
+       promises.push(fetchOsrmRoute(wA.lat, wA.lon, wB.lat, wB.lon, profile));
+    }
+    const results = await Promise.all(promises);
+    
+    let allSuccess = true;
+    for (let i = 0; i < results.length; i++) {
+      const pts = results[i];
+      if (pts && pts.length > 1) {
+        state.segments[lo + i] = { type: 'road', profile, pts };
+      } else {
+        state.segments[lo + i] = { type: 'straight', profile: 'straight', pts: [] };
+        allSuccess = false;
+      }
+    }
+
+    if (allSuccess) {
+      showStatus(t('statusSnapDone'), 'success', 2500);
+    } else {
+      showStatus(t('statusNoRoute'), 'warn', 3000);
+    }
+  } catch {
+    showStatus(t('statusNoRoute'), 'warn', 3000);
+  }
+  
+  redrawPath();
+  updateStats();
+}
+
+async function fetchOsrmRoute(lat1, lon1, lat2, lon2, profile = 'foot') {
+  const url =
+    `https://router.project-osrm.org/route/v1/${profile}/${lon1},${lat1};${lon2},${lat2}` +
+    `?geometries=geojson&overview=full`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const data = await res.json();
+  if (data.code !== 'Ok' || !data.routes?.length) return null;
+  return data.routes[0].geometry.coordinates.map(([lon, lat]) => ({ lat, lon }));
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  GPX parsing
+// ════════════════════════════════════════════════════════════════════════
+function parseGPX(text) {
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const ns = 'http://www.topografix.com/GPX/1/1';
+
+  const getEl = (parent, tag) =>
+    parent.getElementsByTagNameNS(ns, tag)[0] ||
+    parent.getElementsByTagName(tag)[0];
+
+  let trkpts = Array.from(doc.getElementsByTagNameNS(ns, 'trkpt'));
+  if (!trkpts.length) trkpts = Array.from(doc.getElementsByTagName('trkpt'));
+
+  // Also try waypoints (wpt)
+  let wpts = Array.from(doc.getElementsByTagNameNS(ns, 'wpt'));
+  if (!wpts.length) wpts = Array.from(doc.getElementsByTagName('wpt'));
+  const allPts = [...trkpts, ...wpts];
+
+  const points = [];
+  for (const pt of allPts) {
+    const lat = parseFloat(pt.getAttribute('lat'));
+    const lon = parseFloat(pt.getAttribute('lon'));
+    if (isNaN(lat) || isNaN(lon)) continue;
+    const timeEl = getEl(pt, 'time');
+    const eleEl = getEl(pt, 'ele');
+    let time = null;
+    if (timeEl?.textContent) {
+      const d = new Date(timeEl.textContent.trim());
+      if (!isNaN(d)) time = d;
+    }
+    points.push({ lat, lon, time, ele: eleEl ? parseFloat(eleEl.textContent) : null });
+  }
+
+  // Try to get track name
+  let nameEl = getEl(doc, 'name');
+  const trackName = nameEl?.textContent?.trim() || '';
+  return { points, trackName };
+}
+
+function loadGPXText(text, filename) {
+  const { points, trackName } = parseGPX(text);
+  if (!points.length) { showStatus('No track points found', 'warn', 3000); return; }
+
+  clearAll(false);
+
+  state.originalFilename = filename || '';
+
+  const fileInfoEl = document.getElementById('file-info');
+  if (filename) {
+    fileInfoEl.textContent = '📄 ' + filename;
+    fileInfoEl.title = filename;
+    fileInfoEl.style.display = 'block';
+  } else {
+    fileInfoEl.style.display = 'none';
+  }
+
+  // Show original reference track
+  const origLatLngs = points.map(p => [p.lat, p.lon]);
+  state.originalLayer = L.polyline(origLatLngs, {
+    color: '#ef4444', weight: 2, opacity: 0.55, dashArray: '3 3',
+  }).addTo(map);
+
+  // Load all points as waypoints (warn if large)
+  const MAX_AUTO = 500;
+  const toLoad = points.length > MAX_AUTO
+    ? points.filter((_, i) => i % Math.ceil(points.length / MAX_AUTO) === 0)
+    : points;
+
+  showStatus(t('statusLoading'), 'info', 0, true);
+  // Use small timeout to let UI paint first
+  setTimeout(() => {
+    toLoad.forEach(p => {
+      const marker = L.marker([p.lat, p.lon], { draggable: true, icon: makeIcon() }).addTo(map);
+      const wp = { lat: p.lat, lon: p.lon, time: p.time, ele: p.ele, marker };
+      marker.on('click', e => { L.DomEvent.stopPropagation(e); onWpClick(wp); });
+      marker.on('dragstart', () => saveHistory());
+      marker.on('drag', ev => {
+        const ll = ev.target.getLatLng();
+        wp.lat = ll.lat; wp.lon = ll.lng;
+        const idx = state.waypoints.indexOf(wp);
+        if (idx > 0 && state.segments[idx-1]?.type === 'road') state.segments[idx-1] = {type:'straight', pts:[]};
+        if (idx < state.waypoints.length-1 && state.segments[idx]?.type === 'road') state.segments[idx] = {type:'straight', pts:[]};
+        redrawPath();
+      });
+      if (state.waypoints.length > 0) state.segments.push({ type:'straight', pts:[] });
+      state.waypoints.push(wp);
+    });
+    redrawPath();
+    updateStats();
+    refreshMarkerIcons();
+    map.fitBounds(state.originalLayer.getBounds(), { padding: [40, 40] });
+    showStatus(t('statusLoaded', toLoad.length), 'success', 3000);
+  }, 30);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Math helpers
+// ════════════════════════════════════════════════════════════════════════
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Build the export path: apply 5m interpolation ONLY to road segments
+function buildExportPath() {
+  if (!state.waypoints.length) return [];
+  const result = [];
+  let currentDist = 0;
+  const anchors = [];
+
+  for (let i = 0; i < state.waypoints.length - 1; i++) {
+    const wA = state.waypoints[i];
+    const wB = state.waypoints[i + 1];
+    const seg = state.segments[i];
+
+    if (i === 0) {
+      result.push({ lat: wA.lat, lon: wA.lon, cumDist: 0 });
+      if (wA.time) anchors.push({ d: 0, t: wA.time.getTime() });
+    }
+
+    if (seg?.type === 'road' && seg.pts?.length > 1) {
+      const cum = [0];
+      for (let k = 1; k < seg.pts.length; k++) {
+        cum.push(cum[k-1] + haversine(seg.pts[k-1].lat, seg.pts[k-1].lon, seg.pts[k].lat, seg.pts[k].lon));
+      }
+      const totalDist = cum[cum.length - 1];
+      
+      let target = 0;
+      let si = 0;
+      const roadPts = [];
+      while (target <= totalDist) {
+        while (si < seg.pts.length - 2 && cum[si+1] < target) si++;
+        let lat, lon;
+        if (si >= seg.pts.length - 1 || cum[si+1] === cum[si]) {
+          lat = seg.pts[si].lat; lon = seg.pts[si].lon;
+        } else {
+          const t = (target - cum[si]) / (cum[si+1] - cum[si]);
+          lat = seg.pts[si].lat + t * (seg.pts[si+1].lat - seg.pts[si].lat);
+          lon = seg.pts[si].lon + t * (seg.pts[si+1].lon - seg.pts[si].lon);
+        }
+        roadPts.push({ lat, lon, cumDist: target });
+        if (target === totalDist) break;
+        target = Math.min(target + 5, totalDist);
+      }
+      
+      for (let j = 1; j < roadPts.length; j++) {
+        result.push({ lat: roadPts[j].lat, lon: roadPts[j].lon, cumDist: currentDist + roadPts[j].cumDist });
+      }
+      currentDist += roadPts[roadPts.length - 1].cumDist;
+    } else {
+      const dist = haversine(wA.lat, wA.lon, wB.lat, wB.lon);
+      currentDist += dist;
+      result.push({ lat: wB.lat, lon: wB.lon, cumDist: currentDist });
+    }
+
+    if (wB.time) anchors.push({ d: currentDist, t: wB.time.getTime() });
+  }
+
+  // Assign timestamps
+  if (!anchors.length) return result.map(p => ({ ...p, time: null }));
+
+  return result.map(pt => {
+    let before = anchors[0], after = anchors[anchors.length - 1];
+    for (let i = 0; i < anchors.length - 1; i++) {
+      if (anchors[i].d <= pt.cumDist && anchors[i+1].d >= pt.cumDist) {
+        before = anchors[i]; after = anchors[i+1]; break;
+      }
+    }
+    let timeMs;
+    if (before.d === after.d) {
+      timeMs = before.t;
+    } else {
+      const ratio = (pt.cumDist - before.d) / (after.d - before.d);
+      timeMs = before.t + ratio * (after.t - before.t);
+    }
+    return { ...pt, time: new Date(timeMs) };
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  GPX export
+// ════════════════════════════════════════════════════════════════════════
+function escXml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtTime(d) {
+  return d instanceof Date && !isNaN(d)
+    ? d.toISOString().replace('.000Z','Z')
+    : '';
+}
+
+function exportGPX() {
+  if (!state.waypoints.length) { showStatus(t('statusNoWaypoints'), 'warn', 3000); return; }
+  showStatus(t('statusExporting'), 'info', 0, true);
+
+  setTimeout(() => {
+    const withTime = buildExportPath();
+    const baseName = (state.originalFilename || 'edited_track.gpx').replace(/\.gpx$/i, '');
+    const name = escXml(baseName);
+    const NS = 'http://www.topografix.com/GPX/1/1';
+    const XSI = 'http://www.w3.org/2001/XMLSchema-instance';
+
+    const lines = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      `<gpx version="1.1" creator="photos-to-fog-of-world-editor" xmlns="${NS}" xmlns:xsi="${XSI}" xsi:schemaLocation="${NS} http://www.topografix.com/GPX/1/1/gpx.xsd">`,
+      '  <metadata>',
+      `    <name>${name}</name>`,
+      '  </metadata>',
+      '  <trk>',
+      `    <name>${name}</name>`,
+      '    <trkseg>',
+    ];
+
+    for (const pt of withTime) {
+      const ts = fmtTime(pt.time);
+      lines.push(`      <trkpt lat="${pt.lat.toFixed(10)}" lon="${pt.lon.toFixed(10)}">`);
+      if (ts) lines.push(`        <time>${ts}</time>`);
+      lines.push('      </trkpt>');
+    }
+    lines.push('    </trkseg>', '  </trk>', '</gpx>');
+
+    const blob = new Blob([lines.join('\n')], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${baseName}_enhanced.gpx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showStatus(t('statusExported'), 'success', 3000);
+  }, 20);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Undo
+// ════════════════════════════════════════════════════════════════════════
+function saveHistory() {
+  // Lightweight snapshot (just coordinates & types, not markers)
+  const snap = {
+    wps: state.waypoints.map(w => ({ lat: w.lat, lon: w.lon, time: w.time, ele: w.ele })),
+    segs: state.segments.map(s => ({ type: s.type, profile: s.profile, pts: [...(s.pts||[])] })),
+  };
+  state.history.push(snap);
+  if (state.history.length > 30) state.history.shift();
+}
+
+function undo() {
+  if (!state.history.length) return;
+  const snap = state.history.pop();
+
+  // Remove all current markers
+  state.waypoints.forEach(wp => map.removeLayer(wp.marker));
+  state.waypoints = [];
+  state.segments = snap.segs.map(s => ({ ...s }));
+
+  snap.wps.forEach(w => {
+    const marker = L.marker([w.lat, w.lon], { draggable: true, icon: makeIcon() }).addTo(map);
+    const wp = { ...w, marker };
+    marker.on('click', e => { L.DomEvent.stopPropagation(e); onWpClick(wp); });
+    marker.on('dragstart', () => saveHistory());
+    marker.on('drag', ev => {
+      const ll = ev.target.getLatLng();
+      wp.lat = ll.lat; wp.lon = ll.lng;
+      const idx = state.waypoints.indexOf(wp);
+      if (idx > 0 && state.segments[idx-1]?.type === 'road') state.segments[idx-1] = {type:'straight', pts:[]};
+      if (idx < state.waypoints.length-1 && state.segments[idx]?.type === 'road') state.segments[idx] = {type:'straight', pts:[]};
+      redrawPath();
+    });
+    state.waypoints.push(wp);
+  });
+
+  redrawPath();
+  updateStats();
+  refreshMarkerIcons();
+  showStatus(t('statusUndone'), 'info', 2000);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Location Search (Nominatim)
+// ════════════════════════════════════════════════════════════════════════
+let searchTimeout = null;
+let searchMarker = null;
+
+function initSearch() {
+  const input = document.getElementById('loc-search-input');
+  const clearBtn = document.getElementById('loc-search-clear');
+  const resultsList = document.getElementById('loc-search-results');
+
+  input.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (val) {
+      clearBtn.style.display = 'block';
+      clearTimeout(searchTimeout);
+      resultsList.style.display = 'block';
+      resultsList.innerHTML = `<div class="search-loading">${t('searchLoading') || '搜尋中...'}</div>`;
+      searchTimeout = setTimeout(() => doSearch(val), 600);
+    } else {
+      clearBtn.style.display = 'none';
+      resultsList.style.display = 'none';
+      clearTimeout(searchTimeout);
+    }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    clearBtn.style.display = 'none';
+    resultsList.style.display = 'none';
+    if (searchMarker) {
+      map.removeLayer(searchMarker);
+      searchMarker = null;
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#search-container')) {
+      resultsList.style.display = 'none';
+    }
+  });
+
+  map.on('click', () => {
+    if (searchMarker) {
+      map.removeLayer(searchMarker);
+      searchMarker = null;
+    }
+  });
+}
+
+async function doSearch(query) {
+  const resultsList = document.getElementById('loc-search-results');
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&accept-language=${lang === 'zh' ? 'zh-TW' : 'en'}`);
+    const data = await res.json();
+    
+    if (!data || data.length === 0) {
+      resultsList.innerHTML = `<div class="search-loading">${t('searchNoResults') || '找不到結果'}</div>`;
+      return;
+    }
+
+    resultsList.innerHTML = '';
+    data.forEach(item => {
+      const li = document.createElement('li');
+      const nameStr = item.name || item.display_name.split(',')[0];
+      li.innerHTML = `
+        <div class="res-name">${escXml(nameStr)}</div>
+        <div class="res-addr" title="${escXml(item.display_name)}">${escXml(item.display_name)}</div>
+      `;
+      li.addEventListener('click', () => {
+        resultsList.style.display = 'none';
+        flyToLocation(item.lat, item.lon, item.display_name);
+      });
+      resultsList.appendChild(li);
+    });
+  } catch (err) {
+    resultsList.innerHTML = `<div class="search-loading">Search Error</div>`;
+  }
+}
+
+window.handleAddSearchWp = function(lat, lon) {
+  if (searchMarker) {
+    map.removeLayer(searchMarker);
+    searchMarker = null;
+  }
+  const insertAfter = findNearestSegment(lat, lon);
+  addWaypoint(lat, lon, new Date().toISOString(), null, insertAfter);
+  redrawPath();
+  updateStats();
+  refreshMarkerIcons();
+};
+
+function flyToLocation(lat, lon, title) {
+  lat = parseFloat(lat);
+  lon = parseFloat(lon);
+  map.flyTo([lat, lon], 16, { animate: true, duration: 1.5 });
+  
+  if (searchMarker) map.removeLayer(searchMarker);
+  
+  const iconHtml = `<div style="width:20px;height:20px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(59,130,246,0.3),0 2px 8px rgba(0,0,0,0.5);animation:wpPulse 1.5s infinite;"></div>`;
+  const customIcon = L.divIcon({ className: '', html: iconHtml, iconSize: [20,20], iconAnchor: [10,10] });
+  
+  searchMarker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+  
+  const uiStr = lang === 'zh' ? '➕ 將此地點新增為軌跡節點' : '➕ Add as Waypoint';
+  const popupContent = `
+    <div style="font-weight:600; font-size:13px; margin-bottom:8px; line-height:1.4; color:#333; max-width:200px;">
+      ${escXml(title)}
+    </div>
+    <button style="width:100%; padding:8px; background:#3b82f6; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer; font-size:12px;" onclick="window.handleAddSearchWp(${lat}, ${lon})">
+      ${uiStr}
+    </button>
+  `;
+  searchMarker.bindPopup(popupContent, { closeButton: false, offset: [0, -6] }).openPopup();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Drag & drop file handling
+// ════════════════════════════════════════════════════════════════════════
+function setupDragDrop() {
+  const dz = document.getElementById('dropzone');
+  let counter = 0;
+
+  document.addEventListener('dragenter', e => {
+    if ([...e.dataTransfer.items].some(i => i.kind === 'file')) {
+      counter++;
+      dz.classList.add('active');
+    }
+  });
+  document.addEventListener('dragleave', () => {
+    counter--;
+    if (counter <= 0) { counter = 0; dz.classList.remove('active'); }
+  });
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => {
+    e.preventDefault();
+    counter = 0;
+    dz.classList.remove('active');
+    const file = e.dataTransfer.files[0];
+    if (file) readGPXFile(file);
+  });
+}
+
+function readGPXFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => loadGPXText(e.target.result, file.name);
+  reader.readAsText(file);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Bootstrap
+// ════════════════════════════════════════════════════════════════════════
+function init() {
+  initMap();
+  applyLang();
+  setupDragDrop();
+  initSearch();
+
+  // Language toggle
+  document.getElementById('btn-lang').addEventListener('click', () => {
+    lang = lang === 'zh' ? 'en' : 'zh';
+    applyLang();
+  });
+
+  // File input
+  document.getElementById('file-input').addEventListener('change', e => {
+    if (e.target.files[0]) readGPXFile(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  // Clear
+  document.getElementById('btn-clear').addEventListener('click', () => clearAll(true));
+
+  // Tool buttons
+  document.querySelectorAll('.tool-btn[data-mode]').forEach(btn => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+  });
+
+  // Snap cancel
+  document.getElementById('btn-snap-cancel').addEventListener('click', () => {
+    state.snapFirst = -1;
+    refreshMarkerIcons();
+    document.getElementById('snap-msg').textContent = t('snapStep1');
+    setMode('pan');
+  });
+
+  // Transport mode buttons in snap prompt
+  document.querySelectorAll('.snap-mode-btn[data-profile]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.snapProfile = btn.dataset.profile;
+      document.querySelectorAll('.snap-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // Undo
+  document.getElementById('tool-undo').addEventListener('click', undo);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  });
+
+  // Export
+  document.getElementById('btn-export').addEventListener('click', exportGPX);
+
+  // Tool button titles (update on lang change handled via data-i18n-title if needed)
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

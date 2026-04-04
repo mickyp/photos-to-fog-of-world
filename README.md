@@ -2,7 +2,7 @@
 
 Convert a folder of geotagged photos into Fog of World compatible `GPX` tracks.
 
-This skill scans photos recursively, extracts timestamps and GPS coordinates from EXIF metadata, sorts usable points by capture time, and writes `GPX` files that Fog of World can import.
+The project scans photos recursively, extracts timestamps and GPS coordinates from EXIF metadata, sorts usable points by capture time, and writes `GPX` files that Fog of World can import.
 
 Traditional Chinese README:
 - [README.zh-TW.md](README.zh-TW.md)
@@ -19,13 +19,13 @@ Traditional Chinese README:
 - Python 3
 - `exiftool`
 
-In addition to the Python scripts, this repo also includes Windows-friendly entry points:
+The repository includes three user-facing entry points:
 
-- `scripts/fog_gpx_cli.py`: a friendlier command-line entry point
-- `scripts/fog_gpx_gui.py`: a simple desktop window for choosing a folder
-- `scripts/build_windows_exe.ps1`: a packaging script that builds single-file Windows `.exe` files and bundles `exiftool.exe`
+- `scripts/build_fog_gpx.py`: the core conversion script
+- `scripts/fog_gpx_cli.py`: a Windows-friendly command-line wrapper
+- `scripts/fog_gpx_gui.py`: a simple desktop window for selecting folders and exporting GPX
 
-### Install `exiftool` on Windows
+## Install `exiftool` on Windows
 
 If `exiftool` is not already available on `PATH`, install it with Scoop:
 
@@ -33,24 +33,24 @@ If `exiftool` is not already available on `PATH`, install it with Scoop:
 scoop install exiftool
 ```
 
-If you only want to use the Windows build, you can download a packaged executable from GitHub Releases instead.
+If you only want the packaged Windows build, download the release artifact from GitHub Releases instead.
 
 ## Output
 
-The script creates one or more `GPX` track files.
+The tool creates one or more `GPX` track files.
 
 Default output paths:
 
 - Single folder: `<input-folder>/<folder-name>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx`
-- Year folder named like `2015`:
-- Child directory GPX: `<input-folder>/<child>/<child>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx`
-- Yearly merged: `<input-folder>/<folder-name>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx`
+- Year folder named like `2015`
+  - Child directory GPX: `<input-folder>/<child>/<child>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx`
+  - Yearly merged GPX: `<input-folder>/<folder-name>_fog_of_world_<YYYYMMDD-HHMMSS>.gpx`
 
-Every default output filename includes a timestamp down to seconds. This applies consistently to the skill workflow, the CLI, and the GUI whenever you let the tool choose the output path automatically.
+Every default output filename includes a timestamp down to seconds. The core script, CLI, and GUI all follow the same naming rule when the output path is not supplied manually.
 
 ## Folder Selection
 
-In normal use, choose the highest folder that represents the trip, month, or year you want to export. Do **not** drill down to the deepest leaf folder unless you intentionally want only that one leaf exported.
+In normal use, choose the highest folder that represents the trip, month, or year you want to export. Do not drill down to the deepest leaf folder unless you intentionally want only that one leaf exported.
 
 Recommended folder selection:
 
@@ -68,7 +68,7 @@ Recommended folder selection:
       └─ IMG_0100.JPG
 ```
 
-If you choose `2024`, the tool will scan downward recursively, process the child folders, and then create a merged GPX back in `2024`.
+If you choose `2024`, the tool scans downward recursively, processes each child folder, and writes a merged GPX back into `2024`.
 
 Typical results:
 
@@ -94,31 +94,41 @@ Common wrong selection:
       └─ IMG_0002.JPG
 ```
 
-If you choose `Day 1`, the tool will only export that leaf folder. It will not automatically know that you wanted a merged `2024` result.
+If you choose `Day 1`, the tool only exports that leaf folder. It will not automatically infer that you wanted a merged `2024` result.
 
-## How It Works
-
-The conversion uses these rules:
+## Conversion Rules
 
 - Read photos recursively from the selected folder down to the deepest supported-photo folders
-- For year folders, process each first-level child directory independently and then merge them back into a GPX at the selected top-level folder
-- Before scanning a first-level child directory, count supported photos in its immediate child directories; if their subtotal is greater than `1000`, scan those immediate child directories individually first and then merge them into the first-level child directory GPX
+- When the input folder name looks like a year such as `2015`, process each first-level child directory independently and then merge them into a yearly GPX
+- Before scanning a large first-level child directory, count supported photos in its immediate child directories; if their subtotal is greater than `1000`, scan those immediate child directories first and then merge them
 - Use `DateTimeOriginal` first and fall back to `CreateDate`
-- Keep only files that have both timestamp and GPS coordinates
-- Ask `exiftool` to pre-filter files that are missing GPS or timestamps
+- Keep only files that have both a timestamp and GPS coordinates
+- Ask `exiftool` to pre-filter files missing GPS or timestamps
 - Include supported photos stored directly at the year root when building the yearly merged GPX
 - Sort all retained points by capture time ascending
 - Convert GPX timestamps to UTC
 - Preserve altitude when available
-- Optionally reuse the latest child-directory `GPX` file with `--reuse-existing-child-gpx` when a year-folder merge is rerun
+- Optionally reuse the latest child-directory `GPX` file with `--reuse-existing-child-gpx`
 
-## Command
+## Core Script
 
 ```powershell
 py scripts/build_fog_gpx.py "C:\path\to\photos" --timezone "Asia/Taipei"
 ```
 
-Windows-friendly CLI wrapper:
+Specify a custom output path:
+
+```powershell
+py scripts/build_fog_gpx.py "C:\path\to\photos" -o "C:\path\to\output\trip_fog_of_world_20260322-120000.gpx" --timezone "Asia/Taipei"
+```
+
+Reuse existing child GPX files for a year folder:
+
+```powershell
+py scripts/build_fog_gpx.py "C:\path\to\2015" --timezone "Asia/Taipei" --reuse-existing-child-gpx
+```
+
+## CLI Wrapper
 
 ```powershell
 py scripts/fog_gpx_cli.py --input "C:\path\to\photos" --timezone "Asia/Taipei"
@@ -127,50 +137,41 @@ py scripts/fog_gpx_cli.py --input "C:\path\to\photos" --timezone "Asia/Taipei"
 Optional output override:
 
 ```powershell
-py scripts/build_fog_gpx.py "C:\path\to\photos" -o "C:\path\to\output\trip_fog_of_world_20260322-120000.gpx" --timezone "Asia/Taipei"
+py scripts/fog_gpx_cli.py --input "C:\path\to\photos" -o "C:\path\to\output\trip.gpx"
 ```
 
-Optional yearly merge that reuses existing child-directory GPX files:
+## GUI
 
-```powershell
-py scripts/build_fog_gpx.py "C:\path\to\2015" --timezone "Asia/Taipei" --reuse-existing-child-gpx
-```
-
-## GUI Usage
-
-Launch the simple desktop app:
+Launch the desktop app:
 
 ```powershell
 py scripts/fog_gpx_gui.py
 ```
 
-Then:
+Typical workflow:
 
 1. Choose the photo folder.
 2. Optionally choose a GPX output path.
 3. Click `Export GPX`.
 
-The app shows progress and alerts you when the file is ready.
-
-The GUI can switch between English and Traditional Chinese from the language selector at the top of the window.
+The app shows progress while scanning and alerts you when the export is complete.
 
 ### GUI Field Guide
 
-- `Photo folder`: The top-level folder that should be scanned. The app will keep scanning downward recursively, so in most cases you should choose the parent trip/month/year folder rather than the deepest leaf folder.
-- `Output GPX (optional)`: Where to save the GPX file. If left blank, the app creates a timestamped GPX inside the selected top-level photo folder.
-- `Timezone`: Used only when photo timestamps do not already include timezone information. `Asia/Taipei` is a good default for photos taken in Taiwan.
-- `Track name (optional)`: The name stored inside the GPX track itself. This is what some apps may show after import. If left blank, the selected folder name is used.
-- `Reuse existing child GPX for yearly folders`: Useful when the selected folder is a year folder such as `2019` and some child folders have already been exported before. The app will reuse those child GPX files instead of rescanning everything.
-- `Skip writing a new GPX when one already exists`: If a matching GPX already exists in the target folder, reuse it instead of creating another new file.
+- `Photo folder`: the top-level folder that should be scanned
+- `Output GPX (optional)`: where to save the GPX file; if left blank, a timestamped file is created in the selected photo folder
+- `Timezone`: used only when timestamps do not already include timezone data
+- `Track name (optional)`: the name written into the GPX metadata
+- `Reuse existing child GPX for yearly folders`: useful when rerunning a year-folder export
+- `Skip writing a new GPX when one already exists`: reuse the newest matching GPX in the folder instead of creating another file
 
-### GUI Filling Tips
+## Web Editor
 
-- For most normal cases, fill only `Photo folder` and leave the rest at their defaults.
-- Choose the upper folder you want merged, not the final deepest folder, unless you only want that leaf exported.
-- Fill `Output GPX` only if you want the GPX saved somewhere else or under a specific filename.
-- Fill `Track name` only if you want a nicer display name after importing into Fog of World or another map app.
-- Turn on the two checkboxes mainly for large or repeated scans.
-- Use the language selector at the top if the user prefers English or Traditional Chinese.
+The repository also contains a browser-based GPX editor:
+
+- `scripts/gpx_editor.html`: standalone editor page (single self-contained HTML file)
+
+See [GPX_EDITOR.md](GPX_EDITOR.md) for usage notes.
 
 ## Build Windows EXEs
 
@@ -189,26 +190,20 @@ Each packaged executable already includes `exiftool.exe`, so the downloaded `.ex
 
 The version number comes from the repository-root `VERSION` file. Update that file before each release. The GUI shows the version in the window title, and the CLI shows it with `--version`.
 
-## Example Codex Prompt
-
-```text
-Use $photos-to-fog-of-world to convert C:\path\to\photos into Fog of World GPX files.
-```
-
 ## Repository Layout
 
-- `SKILL.md`: Skill definition and usage instructions
-- `agents/openai.yaml`: UI metadata
-- `scripts/build_fog_gpx.py`: Conversion script
-- `scripts/fog_gpx_cli.py`: CLI wrapper for end users
-- `scripts/fog_gpx_gui.py`: GUI wrapper for end users
-- `scripts/build_windows_exe.ps1`: Windows packaging helper
+- `SKILL.md`: skill definition and usage notes
+- `agents/openai.yaml`: metadata for the skill UI
+- `scripts/build_fog_gpx.py`: core conversion logic
+- `scripts/fog_gpx_cli.py`: end-user CLI wrapper
+- `scripts/fog_gpx_gui.py`: end-user GUI wrapper
+- `scripts/gpx_editor.html`: browser-based GPX editor
+- `scripts/build_windows_exe.ps1`: packaging helper for Windows builds
 
 ## Notes
 
 - Photos without GPS coordinates are skipped
-- If timestamps do not include an offset, the provided `--timezone` value is used as the local timezone assumption
-- If the input is a year bucket, the script processes every first-level child directory and then creates a merged year track
-- Large first-level child directories are automatically split one level deeper when their immediate child directories contain more than `1000` supported photos in total
-- When a year-root photo does not contain both timestamp and GPS metadata, it is skipped from the merged year track
-- Fog of World supports importing existing tracks via `GPX` or `KML`
+- When timestamps do not include an offset, the provided `--timezone` value is used as the local timezone assumption
+- Year folders are processed child-by-child and then merged back into a single yearly GPX
+- Large child folders are automatically split one level deeper before merging
+- Fog of World can import existing tracks from `GPX` or `KML`
