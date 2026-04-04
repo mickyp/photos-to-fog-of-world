@@ -6,8 +6,7 @@ The project scans photos recursively, extracts timestamps and GPS coordinates fr
 
 **Website (GitHub Pages):** [https://mickyp.github.io/photos-to-fog-of-world/](https://mickyp.github.io/photos-to-fog-of-world/)
 
-Traditional Chinese README:
-- [README.zh-TW.md](README.zh-TW.md)
+- [正體中文版](README.zh-TW.md)
 
 ## Supported Photo Types
 

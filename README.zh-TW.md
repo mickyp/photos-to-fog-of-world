@@ -6,8 +6,7 @@
 
 **官網（GitHub Pages）：** [https://mickyp.github.io/photos-to-fog-of-world/](https://mickyp.github.io/photos-to-fog-of-world/)
 
-英文說明請見：
-- [README.md](README.md)
+- [English Version](README.md)
 
 ## 支援格式
 
