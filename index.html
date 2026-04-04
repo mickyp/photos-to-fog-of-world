@@ -245,6 +245,48 @@
     .footer a:hover {
       text-decoration: underline;
     }
+
+    .road-demo {
+      max-width: 920px;
+      margin: 0 auto 4rem;
+      text-align: center;
+      animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    .road-demo-title {
+      font-size: clamp(1.15rem, 2.5vw, 1.35rem);
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      color: #e2e8f0;
+      letter-spacing: -0.02em;
+    }
+
+    .road-demo-figure {
+      margin: 0;
+    }
+
+    .road-demo-figure img {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .road-demo-caption {
+      margin-top: 1.1rem;
+      font-size: clamp(0.9rem, 1.8vw, 1rem);
+      color: var(--text-muted);
+      line-height: 1.65;
+      max-width: 42rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
   </style>
 </head>
 <body>
@@ -262,6 +304,23 @@
       <h1 class="title" data-i18n="heroTitle">Photos to Fog of World</h1>
       <p class="subtitle" data-i18n="heroSubtitle">Transform photos with GPS data into GPX tracks for Fog of World and keep the travel timeline from your camera intact.</p>
     </header>
+
+    <section class="road-demo" aria-labelledby="road-demo-heading">
+      <h2 id="road-demo-heading" class="road-demo-title" data-i18n="roadDemoTitle">Road snap between two waypoints</h2>
+      <figure class="road-demo-figure">
+        <img
+          src="images/map-auto-road.png"
+          width="920"
+          loading="lazy"
+          decoding="async"
+          data-i18n-alt="roadDemoAlt"
+          alt="Map screenshot: two waypoints connected by a road-snapped route"
+        />
+        <figcaption class="road-demo-caption" data-i18n="roadDemoCaption">
+          Demo of the web editor&rsquo;s Road mode: pick a routing profile, select start and end waypoints, and OSRM fills the path along drivable roads between them.
+        </figcaption>
+      </figure>
+    </section>
 
     <main class="cards-grid">
       <a href="scripts/gpx_editor.html" class="card primary-card">
@@ -303,6 +362,10 @@
         card2Cta: 'Open repository',
         footerText: '&copy; 2026 Photos to Fog of World. Hosted on ',
         langBtnText: '中文',
+        roadDemoTitle: 'Road snap between two waypoints',
+        roadDemoAlt: 'Map screenshot: two waypoints connected by a road-snapped route',
+        roadDemoCaption:
+          'Demo of the Web GPX Editor&rsquo;s <strong>Road</strong> mode: choose a routing profile (car, bike, or walk), tap two waypoints, and OSRM draws the route along real roads&mdash;ready to export for Fog of World.',
       },
       zh: {
         heroTitle: 'Photos to Fog of World',
@@ -315,6 +378,10 @@
         card2Cta: '前往儲存庫',
         footerText: '&copy; 2026 Photos to Fog of World. 託管於 ',
         langBtnText: 'EN',
+        roadDemoTitle: '兩點之間貼道路線示範',
+        roadDemoAlt: '地圖截圖：兩個節點之間依道路自動連線',
+        roadDemoCaption:
+          '此為 <strong>Web GPX 編輯器</strong> 的<strong>道路</strong>模式：選擇交通方式（汽車／腳踏車／步行等），點選兩個節點後，會透過 OSRM 在可通行道路上產生路徑，再匯出給 Fog of World 使用。',
       }
     };
 
@@ -327,6 +394,12 @@
         const key = el.getAttribute('data-i18n');
         if (dict[key]) {
           el.innerHTML = dict[key];
+        }
+      });
+      document.querySelectorAll('[data-i18n-alt]').forEach((el) => {
+        const key = el.getAttribute('data-i18n-alt');
+        if (dict[key]) {
+          el.setAttribute('alt', dict[key]);
         }
       });
       document.getElementById('lang-btn').innerText = dict.langBtnText;
