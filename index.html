@@ -9,18 +9,17 @@
   <style>
     :root {
       --bg: #09090b;
-      --card-bg: rgba(24, 24, 27, 0.6);
-      --card-hover: rgba(39, 39, 42, 0.8);
+      --card-bg: rgba(24, 24, 27, 0.64);
+      --card-hover: rgba(39, 39, 42, 0.86);
       --border: rgba(255, 255, 255, 0.1);
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --primary: #38bdf8;
       --secondary: #818cf8;
-      --spot-color: radial-gradient(circle at 50% 50%, rgba(56,189,248,0.15), transparent 60%);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    
+
     body {
       background-color: var(--bg);
       color: var(--text);
@@ -34,22 +33,38 @@
       position: relative;
     }
 
-    /* Animated Background */
     .bg-blobs {
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
+      inset: 0;
       overflow: hidden;
       z-index: -1;
       pointer-events: none;
     }
+
     .blob {
       position: absolute;
       filter: blur(80px);
       opacity: 0.5;
       animation: float 10s ease-in-out infinite alternate;
     }
-    .blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: rgba(56, 189, 248, 0.3); animation-delay: 0s; }
-    .blob-2 { bottom: -10%; right: -10%; width: 60vw; height: 60vw; background: rgba(129, 140, 248, 0.2); animation-delay: -5s; }
+
+    .blob-1 {
+      top: -10%;
+      left: -10%;
+      width: 50vw;
+      height: 50vw;
+      background: rgba(56, 189, 248, 0.3);
+      animation-delay: 0s;
+    }
+
+    .blob-2 {
+      bottom: -10%;
+      right: -10%;
+      width: 60vw;
+      height: 60vw;
+      background: rgba(129, 140, 248, 0.2);
+      animation-delay: -5s;
+    }
 
     @keyframes float {
       0% { transform: translateY(0) scale(1); }
@@ -62,6 +77,7 @@
       right: 2rem;
       z-index: 100;
     }
+
     .lang-btn {
       background: var(--card-bg);
       border: 1px solid var(--border);
@@ -71,9 +87,9 @@
       font-weight: 600;
       cursor: pointer;
       backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
       transition: all 0.3s ease;
     }
+
     .lang-btn:hover {
       background: var(--card-hover);
       border-color: var(--primary);
@@ -109,7 +125,7 @@
     .subtitle {
       font-size: clamp(1.1rem, 2vw, 1.4rem);
       color: var(--text-muted);
-      max-width: 600px;
+      max-width: 650px;
       margin: 0 auto;
       line-height: 1.6;
     }
@@ -136,13 +152,12 @@
       position: relative;
       overflow: hidden;
       backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
     }
 
     .card::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
+      inset: 0;
       background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%);
       opacity: 0;
       transition: opacity 0.4s;
@@ -194,7 +209,8 @@
     }
 
     .card-cta svg {
-      width: 16px; height: 16px;
+      width: 16px;
+      height: 16px;
       transition: transform 0.3s;
     }
 
@@ -220,52 +236,50 @@
       animation: fadeUp 1s ease 0.4s forwards;
       opacity: 0;
     }
-    
+
     .footer a {
       color: var(--primary);
       text-decoration: none;
     }
+
     .footer a:hover {
       text-decoration: underline;
     }
   </style>
 </head>
 <body>
-
   <div class="bg-blobs">
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
   </div>
 
   <div class="lang-switch">
-    <button id="lang-btn" class="lang-btn" onclick="toggleLang()">中</button>
+    <button id="lang-btn" class="lang-btn" onclick="toggleLang()">中文</button>
   </div>
 
   <div class="container">
     <header class="hero">
       <h1 class="title" data-i18n="heroTitle">Photos to Fog of World</h1>
-      <p class="subtitle" data-i18n="heroSubtitle">Transform photos with GPS data into GPX tracks for Fog of World, recording every step of your journey flawlessly.</p>
+      <p class="subtitle" data-i18n="heroSubtitle">Transform photos with GPS data into GPX tracks for Fog of World and keep the travel timeline from your camera intact.</p>
     </header>
 
     <main class="cards-grid">
-      <!-- Web GPX Editor -->
       <a href="scripts/gpx_editor.html" class="card primary-card">
-        <span class="card-icon">🗺️</span>
+        <span class="card-icon">Map</span>
         <h2 class="card-title" data-i18n="card1Title">Web GPX Editor</h2>
-        <p class="card-desc" data-i18n="card1Desc">A powerful, installation-free editor running directly in your browser. Load GPX tracks, easily prune or add nodes, snap to roads, and search locations to build the perfect tracks for Fog of World.</p>
+        <p class="card-desc" data-i18n="card1Desc">Open a GPX file in the browser, trim or add waypoints, snap selected ranges to roads, and export a cleaner track for Fog of World.</p>
         <div class="card-cta">
-          <span data-i18n="card1Cta">Launch Editor</span>
+          <span data-i18n="card1Cta">Launch editor</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
         </div>
       </a>
 
-      <!-- Local Tool / GitHub Repo -->
-      <a href="https://github.com/mickyp/photos-to-fog-of-world" target="_blank" class="card">
-        <span class="card-icon">💻</span>
-        <h2 class="card-title" data-i18n="card2Title">Bulk Photo Converter Tool</h2>
-        <p class="card-desc" data-i18n="card2Desc">A standalone desktop tool with CLI and GUI support. Automatically scan entire folders of photos with GPS and generate precisely timed GPX files.</p>
+      <a href="https://github.com/mickyp/photos-to-fog-of-world" target="_blank" rel="noreferrer" class="card">
+        <span class="card-icon">CLI</span>
+        <h2 class="card-title" data-i18n="card2Title">Photo Converter Tool</h2>
+        <p class="card-desc" data-i18n="card2Desc">Use the Python script, CLI wrapper, or Windows GUI to scan entire folders of geotagged photos and export GPX files in bulk.</p>
         <div class="card-cta">
-          <span data-i18n="card2Cta">Visit GitHub Repo</span>
+          <span data-i18n="card2Cta">Open repository</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
         </div>
       </a>
@@ -273,34 +287,34 @@
   </div>
 
   <footer class="footer">
-    <p><span data-i18n="footerText">&copy; 2026 Photos to Fog of World. Hosted on </span><a href="https://pages.github.com" target="_blank">GitHub Pages</a>.</p>
+    <p><span data-i18n="footerText">&copy; 2026 Photos to Fog of World. Hosted on </span><a href="https://pages.github.com" target="_blank" rel="noreferrer">GitHub Pages</a>.</p>
   </footer>
 
   <script>
     const i18n = {
       en: {
-        heroTitle: "Photos to Fog of World",
-        heroSubtitle: "Transform photos with GPS data into GPX tracks for Fog of World, recording every step of your journey flawlessly.",
-        card1Title: "Web GPX Editor",
-        card1Desc: "A powerful, installation-free editor running directly in your browser. Load GPX tracks, easily prune or add nodes, snap to roads, and search locations to build the perfect tracks for Fog of World.",
-        card1Cta: "Launch Web Editor",
-        card2Title: "Bulk Photo Converter Tool",
-        card2Desc: "A standalone desktop tool with CLI and GUI support. Automatically scan entire folders of photos with GPS and generate precisely timed GPX files.",
-        card2Cta: "Visit GitHub Repo",
-        footerText: "© 2026 Photos to Fog of World. Hosted on ",
-        langBtnText: "中"
+        heroTitle: 'Photos to Fog of World',
+        heroSubtitle: 'Transform photos with GPS data into GPX tracks for Fog of World and keep the travel timeline from your camera intact.',
+        card1Title: 'Web GPX Editor',
+        card1Desc: 'Open a GPX file in the browser, trim or add waypoints, snap selected ranges to roads, and export a cleaner track for Fog of World.',
+        card1Cta: 'Launch editor',
+        card2Title: 'Photo Converter Tool',
+        card2Desc: 'Use the Python script, CLI wrapper, or Windows GUI to scan entire folders of geotagged photos and export GPX files in bulk.',
+        card2Cta: 'Open repository',
+        footerText: '&copy; 2026 Photos to Fog of World. Hosted on ',
+        langBtnText: '中文',
       },
       zh: {
-        heroTitle: "Photos to Fog of World",
-        heroSubtitle: "將帶有 GPS 資訊的照片完美轉化為世界迷霧使用的 GPX 軌跡，記錄你的每一步足跡。",
-        card1Title: "雲端 GPX 軌跡編輯器",
-        card1Desc: "免安裝直接在瀏覽器運作的強大編輯器。載入 GPX 軌跡，在地圖上輕鬆修剪、新增節點，系統更具備「自動貼齊道路」與「地點搜尋」功能，為完美迷霧而生。",
-        card1Cta: "立即啟動編輯器",
-        card2Title: "照片批次轉軌跡工具",
-        card2Desc: "具備命令列 (CLI) 與視窗介面 (GUI) 的單機小工具，支援一鍵遞迴掃描整個資料夾的 Heic/Jpg 照片，依照拍攝時間精準生成 GPX 檔案。",
-        card2Cta: "前往 GitHub 專案庫",
-        footerText: "© 2026 Photos to Fog of World. 託管於 ",
-        langBtnText: "EN"
+        heroTitle: 'Photos to Fog of World',
+        heroSubtitle: '把帶有 GPS 資訊的照片整理成 Fog of World 可匯入的 GPX 軌跡，同時保留拍攝時間順序。',
+        card1Title: 'Web GPX 編輯器',
+        card1Desc: '直接在瀏覽器開啟 GPX、刪減或補點、把指定區段貼齊道路，最後匯出更適合 Fog of World 的軌跡。',
+        card1Cta: '開啟編輯器',
+        card2Title: '照片轉 GPX 工具',
+        card2Desc: '使用 Python 腳本、命令列包裝或 Windows GUI，一次掃描整批有 GPS 的照片並輸出 GPX。',
+        card2Cta: '前往儲存庫',
+        footerText: '&copy; 2026 Photos to Fog of World. 託管於 ',
+        langBtnText: 'EN',
       }
     };
 
@@ -309,10 +323,10 @@
     function setLang(lang) {
       currentLang = lang;
       const dict = i18n[lang];
-      document.querySelectorAll('[data-i18n]').forEach(el => {
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
         const key = el.getAttribute('data-i18n');
         if (dict[key]) {
-          el.innerText = dict[key];
+          el.innerHTML = dict[key];
         }
       });
       document.getElementById('lang-btn').innerText = dict.langBtnText;
@@ -323,7 +337,6 @@
       setLang(currentLang === 'en' ? 'zh' : 'en');
     }
 
-    // Initialize layout default to English
     setLang('en');
   </script>
 </body>
